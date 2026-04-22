@@ -357,6 +357,11 @@ class OffsetArea(Area):
         self._bytes = 4   # how many offset bytes to display (4 → 8 hex digits)
 
     def realize(self) -> None:
+        # Set offset digits to red to match the original Bless appearance
+        red = Gdk.RGBA(red=0.8, green=0.0, blue=0.0, alpha=1.0)
+        for row in range(2):
+            for col in range(2):
+                self.drawer_info.fg_normal[row][col] = red
         self.drawer = OffsetHexDrawer(self.area_group.drawing_area, self.drawer_info)
         super().realize()
 
@@ -519,14 +524,15 @@ class SeparatorArea(Area):
         self._sep_width = 8   # total pixel width — one full character
 
     def render(self) -> None:
-        """Draw the vertical separator line for the entire visible height."""
-        if self._cr is None or self.width <= 0:
+        """Draw a thin 1-pixel vertical line centred in the separator column."""
+        if self._cr is None or self.width <= 0 or self.height <= 0:
             return
         cr = self._cr
-        # Background
         cr.save()
-        cr.set_source_rgb(0, 0, 0)   # black line
+        # Use a subtle dark-grey rather than solid black, matching the original
+        cr.set_source_rgba(0.3, 0.3, 0.3, 1.0)
         mid = self.x + self.width // 2
+        # Snap to pixel grid for a crisp 1-px line
         cr.set_line_width(1.0)
         cr.move_to(mid + 0.5, self.y)
         cr.line_to(mid + 0.5, self.y + self.height)

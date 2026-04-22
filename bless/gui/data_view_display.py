@@ -15,6 +15,7 @@ from .areas.concrete_areas import HexArea, AsciiArea, OffsetArea, SeparatorArea
 from .conversion_panel import ConversionPanel
 from .find_bar import FindBar, FindReplaceBar
 from .goto_offset import GotoOffsetBar
+from .select_range_bar import SelectRangeBar
 
 if TYPE_CHECKING:
     from .data_view import DataView
@@ -71,10 +72,11 @@ class DataViewDisplay(Gtk.Box):
         self._file_changed_bar.add_button("Reload", Gtk.ResponseType.YES)
         self._file_changed_bar.connect("response", self._on_file_changed_response)
 
-        # ── Find / replace / goto bars ────────────────────────────────
+        # ── Find / replace / goto / select-range bars ─────────────────
         self._find_bar         = FindBar()
         self._find_replace_bar = FindReplaceBar()
         self._goto_bar         = GotoOffsetBar()
+        self._select_range_bar = SelectRangeBar()
 
         # ── Conversion panel ──────────────────────────────────────────
         self._conv_panel = ConversionPanel()
@@ -87,6 +89,7 @@ class DataViewDisplay(Gtk.Box):
         self.pack_start(self._find_bar,         False, False, 0)
         self.pack_start(self._find_replace_bar, False, False, 0)
         self.pack_start(self._goto_bar,         False, False, 0)
+        self.pack_start(self._select_range_bar, False, False, 0)
         self.pack_start(sep,                    False, False, 0)
         self.pack_start(self._conv_panel,       False, False, 0)
 
@@ -112,10 +115,10 @@ class DataViewDisplay(Gtk.Box):
 
         self.show_all()
         self._file_changed_bar.hide()
-        # These bars start hidden; revealed by keyboard shortcuts
         self._find_bar.hide()
         self._find_replace_bar.hide()
         self._goto_bar.hide()
+        self._select_range_bar.hide()
 
     # ------------------------------------------------------------------
     # Properties
@@ -279,6 +282,16 @@ class DataViewDisplay(Gtk.Box):
     def goto_bar(self) -> GotoOffsetBar:
         return self._goto_bar
 
+    @property
+    def select_range_bar(self) -> SelectRangeBar:
+        return self._select_range_bar
+
+    def show_select_range(self) -> None:
+        self._find_bar.hide()
+        self._find_replace_bar.hide()
+        self._goto_bar.hide()
+        self._select_range_bar.show_bar()
+
     def show_goto(self) -> None:
         self._find_bar.hide()
         self._find_replace_bar.hide()
@@ -350,6 +363,10 @@ class DataViewDisplay(Gtk.Box):
             return True
         if ctrl and event.keyval in (Gdk.KEY_g, Gdk.KEY_G):
             self.show_goto()
+            return True
+        shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+        if ctrl and shift and event.keyval in (Gdk.KEY_r, Gdk.KEY_R):
+            self.show_select_range()
             return True
         if self._control:
             return self._control.on_key_press(widget, event)

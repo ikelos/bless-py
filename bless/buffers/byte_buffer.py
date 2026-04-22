@@ -110,6 +110,13 @@ class ByteBuffer:
 
     def _emit_file_changed(self) -> None:
         if self._emit_events:
+            from ..logger import get as _log
+            _log().debug(
+                "_emit_file_changed fired for %r  "
+                "num_handlers=%d",
+                getattr(self._file_buf, 'filename', '?'),
+                len(self._file_changed_handlers),
+            )
             for h in list(self._file_changed_handlers):
                 h(self)
 
@@ -162,15 +169,21 @@ class ByteBuffer:
             from watchdog.observers import Observer
             from watchdog.events import FileSystemEventHandler
             import time
+            from ..logger import get as _log
 
             directory = os.path.dirname(self._file_buf.filename) or "."
-            fname = os.path.basename(self._file_buf.filename)
+            fname     = os.path.basename(self._file_buf.filename)
 
-            # Record mtime at open time; only fire if mtime actually changes
+            # Record mtime at open time; only fire if mtime actually advances
             try:
                 self._watch_mtime = os.path.getmtime(self._file_buf.filename)
             except OSError:
                 self._watch_mtime = 0.0
+
+            _log().debug(
+                "Watcher started for %r  mtime_at_open=%.6f",
+                self._file_buf.filename, self._watch_mtime,
+            )
 
             class _Handler(FileSystemEventHandler):
                 def __init__(self, bb: "ByteBuffer") -> None:
@@ -181,11 +194,24 @@ class ByteBuffer:
                         return
                     if os.path.basename(event.src_path) != fname:
                         return
-                    # Only emit if mtime has actually advanced since open
                     try:
                         new_mtime = os.path.getmtime(event.src_path)
-                    except OSError:
+                    except OSError as exc:
+                        _log().debug(
+                            "Watcher on_modified: stat failed for %r  exc=%s",
+                            event.src_path, exc,
+                        )
                         return
+                    _log().debug(
+                        "Watcher on_modified: file=%r  "
+                        "new_mtime=%.6f  stored_mtime=%.6f  "
+                        "delta=%.6f  will_emit=%s",
+                        event.src_path,
+                        new_mtime,
+                        self._bb._watch_mtime,
+                        new_mtime - self._bb._watch_mtime,
+                        new_mtime > self._bb._watch_mtime,
+                    )
                     if new_mtime > self._bb._watch_mtime:
                         self._bb._watch_mtime = new_mtime
                         self._bb._emit_file_changed()

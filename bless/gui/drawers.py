@@ -62,8 +62,8 @@ class DrawerInfo:
 
     def __init__(self) -> None:
         self.font_name = "Courier 12"
-        self.font_language = "en"   # BCP-47 tag; empty string = system default
-        self.uppercase = False
+        self.font_language = "en"
+        self.uppercase = True   # hex digits always uppercase
 
         self.fg_normal:    list[list[Optional[Gdk.RGBA]]] = [
             [_parse_rgba("black"), _parse_rgba("blue")],
@@ -124,6 +124,11 @@ class Drawer:
         ctx.set_language(lang)
 
         self._layout = Pango.Layout(ctx)
+        # Disable ligatures so "ff", "fi", "fl" etc. each render as separate glyphs
+        attrs = Pango.AttrList()
+        # font-variant-ligatures: none  — disable all ligature substitutions
+        attrs.insert(Pango.attr_font_features_new("liga 0, calt 0, clig 0"))
+        self._layout.set_attributes(attrs)
         self._layout.set_text("X", -1)
         self._char_w, self._char_h = self._layout.get_pixel_size()
         self._layout.set_text("", -1)

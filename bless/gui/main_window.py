@@ -77,6 +77,22 @@ class MainWindow(Gtk.ApplicationWindow):
         root.pack_start(self._statusbar, False, False, 0)
         self._ctx = self._statusbar.get_context_id("main")
 
+        # Keyboard accelerators
+        accel = Gtk.AccelGroup()
+        self.add_accel_group(accel)
+
+        def _accel(key, mods, fn):
+            accel.connect(Gdk.keyval_from_name(key), mods,
+                          Gtk.AccelFlags.VISIBLE, lambda *_: fn())
+
+        ctrl       = Gdk.ModifierType.CONTROL_MASK
+        ctrl_shift = Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK
+
+        _accel("z", ctrl,       lambda: self._current_dv_call("undo"))
+        _accel("z", ctrl_shift, lambda: self._current_dv_call("redo"))
+        _accel("a", ctrl,       self._select_all)
+        _accel("r", ctrl_shift, self._show_select_range)
+
     def _build_menu_bar(self) -> Gtk.MenuBar:
         mb = Gtk.MenuBar()
 
@@ -105,15 +121,16 @@ class MainWindow(Gtk.ApplicationWindow):
         # Edit menu
         edit_menu = Gtk.Menu()
         for label, cb in (
-            ("_Undo",         lambda *_: self._current_dv_call("undo")),
-            ("_Redo",         lambda *_: self._current_dv_call("redo")),
+            ("_Undo         Ctrl+Z",       lambda *_: self._current_dv_call("undo")),
+            ("_Redo  Shift+Ctrl+Z",        lambda *_: self._current_dv_call("redo")),
             (None, None),
-            ("Cu_t",          lambda *_: self._current_dv_call("cut")),
-            ("_Copy",         lambda *_: self._current_dv_call("copy")),
-            ("_Paste",        lambda *_: self._current_dv_call("paste")),
-            ("_Delete",       lambda *_: self._current_dv_call("delete")),
+            ("Cu_t",                       lambda *_: self._current_dv_call("cut")),
+            ("_Copy",                      lambda *_: self._current_dv_call("copy")),
+            ("_Paste",                     lambda *_: self._current_dv_call("paste")),
+            ("_Delete",                    lambda *_: self._current_dv_call("delete")),
             (None, None),
-            ("Select _All",   lambda *_: self._select_all()),
+            ("Select _All         Ctrl+A", lambda *_: self._select_all()),
+            ("Select _Range  Shift+Ctrl+R",lambda *_: self._show_select_range()),
         ):
             if label is None:
                 edit_menu.append(Gtk.SeparatorMenuItem())
@@ -193,6 +210,11 @@ class MainWindow(Gtk.ApplicationWindow):
         dv = self._data_book.current_view
         if dv and dv.buffer:
             dv.set_selection(0, dv.buffer.size - 1)
+
+    def _show_select_range(self) -> None:
+        dv = self._data_book.current_view
+        if dv:
+            dv.display.show_select_range()
 
     def _show_find(self) -> None:
         dv = self._data_book.current_view
@@ -345,7 +367,21 @@ class BlessApplication(Gtk.Application):
 
 
 def main(args: list[str] | None = None) -> int:
+    import argparse
+    from ..logger import setup as _log_setup
+
     if args is None:
         args = sys.argv
+
+    parser = argparse.ArgumentParser(
+        prog="bless",
+        description="Bless Hex Editor",
+        add_help=False,   # let GApplication handle --help
+    )
+    parser.add_argument("--debug", action="store_true",
+                        help="Enable verbose diagnostic logging to stderr")
+    known, remaining = parser.parse_known_args(args[1:])
+    _log_setup(verbose=known.debug)
+
     app = BlessApplication()
-    return app.run(args)
+    return app.run([args[0]] + remaining)

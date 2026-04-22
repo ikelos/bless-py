@@ -209,6 +209,7 @@ class DataView:
         self._dv_display.find_bar.attach_view(self)
         self._dv_display.find_replace_bar.attach_view(self)
         self._dv_display.goto_bar.attach_view(self)
+        self._dv_display.select_range_bar.attach_view(self)
 
         self._dv_display.redraw()
         self._dv_display.vscroll.set_value(0)

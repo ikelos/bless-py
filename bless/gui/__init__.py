@@ -5,6 +5,7 @@ from .drawers import (
 from .conversion_panel import ConversionPanel
 from .find_bar import FindBar, FindReplaceBar
 from .goto_offset import GotoOffsetBar
+from .select_range_bar import SelectRangeBar
 from .data_view import DataView, CursorState
 from .data_view_display import DataViewDisplay
 from .data_view_control import DataViewControl
