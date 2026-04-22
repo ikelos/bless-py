@@ -53,6 +53,7 @@ class AreaGroup:
         self._highlights: IntervalTree[Highlight] = IntervalTree()
         self._selection = Highlight(HighlightType.Selection)
         self._highlights.insert(self._selection)
+        self._pattern_highlights: list[Highlight] = []
 
         self._buffer_cache: Optional[bytearray] = None
 
@@ -147,11 +148,49 @@ class AreaGroup:
     @selection.setter
     def selection(self, r: Range) -> None:
         self._highlights.delete(self._selection)
+        # Clear old pattern-match highlights
+        for pm in list(self._pattern_highlights):
+            self._highlights.delete(pm)
+        self._pattern_highlights.clear()
+
         self._selection.start = r.start
         self._selection.end   = r.end
         if not self._selection.is_empty():
             self._highlights.insert(self._selection)
+            # Scan buffer for identical byte sequences and add PatternMatch highlights
+            self._add_pattern_highlights(r)
         self.redraw_now()
+
+    def _add_pattern_highlights(self, r: Range) -> None:
+        """Find all occurrences of the selected byte sequence and highlight them."""
+        if self._buffer is None or r.is_empty():
+            return
+        length = r.end - r.start + 1
+        if length < 1 or length > 256:   # skip very long selections
+            return
+        # Read the selected pattern
+        pattern = bytearray(length)
+        try:
+            for i in range(length):
+                pattern[i] = self._buffer[r.start + i]
+        except (IndexError, Exception):
+            return
+        # Scan the buffer for matches (simple BM-like scan)
+        from ...tools.find import BMFindStrategy
+        strategy = BMFindStrategy()
+        strategy.buffer  = self._buffer
+        strategy.pattern = bytes(pattern)
+        strategy.position = 0
+        while True:
+            m = strategy.find_next()
+            if m is None:
+                break
+            # Don't add a pattern highlight over the selection itself
+            if m.start == r.start and m.end == r.end:
+                continue
+            pm = Highlight(HighlightType.PatternMatch, m.start, m.end)
+            self._pattern_highlights.append(pm)
+            self._highlights.insert(pm)
 
     # ------------------------------------------------------------------
     # Cache

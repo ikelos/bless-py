@@ -127,12 +127,16 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # Search menu
         search_menu = Gtk.Menu()
-        find_item = Gtk.MenuItem.new_with_mnemonic("_Find…       Ctrl+F")
+        find_item = Gtk.MenuItem.new_with_mnemonic("_Find…            Ctrl+F")
         find_item.connect("activate", lambda *_: self._show_find())
         search_menu.append(find_item)
         fr_item = Gtk.MenuItem.new_with_mnemonic("Find & _Replace…  Ctrl+H")
         fr_item.connect("activate", lambda *_: self._show_find_replace())
         search_menu.append(fr_item)
+        search_menu.append(Gtk.SeparatorMenuItem())
+        goto_item = Gtk.MenuItem.new_with_mnemonic("_Go to Offset…    Ctrl+G")
+        goto_item.connect("activate", lambda *_: self._show_goto())
+        search_menu.append(goto_item)
         search_item = Gtk.MenuItem.new_with_mnemonic("_Search")
         search_item.set_submenu(search_menu)
         mb.append(search_item)
@@ -199,6 +203,11 @@ class MainWindow(Gtk.ApplicationWindow):
         dv = self._data_book.current_view
         if dv:
             dv.display.show_find_replace()
+
+    def _show_goto(self) -> None:
+        dv = self._data_book.current_view
+        if dv:
+            dv.display.show_goto()
 
     def _show_about(self) -> None:
         dlg = Gtk.AboutDialog(transient_for=self, modal=True)
@@ -280,7 +289,7 @@ class MainWindow(Gtk.ApplicationWindow):
         mode = "OVR" if dv.overwrite else "INS"
 
         sel_str = "Selection: None"
-        if not sel.is_empty():
+        if not sel.is_empty() and sel.start >= 0 and sel.end >= sel.start:
             n = sel.end - sel.start + 1
             sel_str = f"Selection: 0x{sel.start:x}–0x{sel.end:x} ({n} bytes)"
 

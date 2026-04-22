@@ -379,8 +379,7 @@ class DataViewControl:
 
         consumed = False
         if dv.selection.is_empty():
-            if (self._im_context.filter_keypress(event)
-                    and fa.handle_key(event.keyval, dv.overwrite)):
+            if fa.handle_key(event.keyval, dv.overwrite):
                 consumed = True
                 self._key_right(cur, nxt)
                 from .data_view import CursorState
@@ -393,17 +392,15 @@ class DataViewControl:
             sel = dv.selection
             dv.buffer.begin_action_chaining()
             try:
-                if (self._im_context.filter_keypress(event)
-                        and fa.handle_key(event.keyval, False)):
+                if fa.handle_key(event.keyval, False):
                     consumed = True
-                    # Delete the selection (the typed char was inserted at sel.start)
-                    # After insert, selection is now one byte wider — delete the rest
+                    # Character inserted at sel.start; delete the rest of selection
                     new_end = sel.start + 1
                     if sel.end >= new_end:
                         dv.buffer.delete(new_end, sel.end + 1)
-                    nxt.first = sel.start - 1
+                    nxt.first  = sel.start - 1
                     nxt.second = sel.start + 1
-                    nxt.digit = 0
+                    nxt.digit  = 0
                     dv.set_selection(-1, -1)
             finally:
                 dv.buffer.end_action_chaining()

@@ -211,29 +211,32 @@ class Area(ABC):
                                          else HighlightType.Selection)
 
     def _render_cursor(self) -> None:
-        if not self._cursor_focus or not self._can_focus:
+        # Draw cursor outline in every focusable area (hex + ascii simultaneously)
+        if not self._can_focus:
             return
         ag = self.area_group
         if ag.buffer is None:
             return
         row, _, cx, cy = self.get_display_info_by_offset(ag.cursor_offset)
-        if self.drawer is None:
+        if self.drawer is None or self._cr is None:
             return
-        # Shift right by cursor_digit so hex shows cursor on the active nibble
-        cx += self._cursor_digit * self.drawer.width
-        # Translate to screen coordinates
+        # For the focused area show digit offset; other areas show at byte start
+        digit_off = self._cursor_digit if self._cursor_focus else 0
+        cx += digit_off * self.drawer.width
         sx = cx + self.x
         sy = cy + self.y
         w  = self.drawer.width
         h  = self.drawer.height
-        color = (self._active_cursor_color if self._is_active
-                 else self._inactive_cursor_color)
-        if self._cr is None:
-            return
-        # Draw as a 2-pixel outline so the character underneath stays visible
+        # Focused area: bright red; other areas: dimmer indicator
+        if self._cursor_focus:
+            color = self._active_cursor_color
+            lw = 2.0
+        else:
+            color = self._inactive_cursor_color
+            lw = 1.0
         self._cr.save()
         self._cr.set_source_rgba(color.red, color.green, color.blue, color.alpha)
-        self._cr.set_line_width(2.0)
+        self._cr.set_line_width(lw)
         self._cr.rectangle(sx + 1, sy + 1, w - 2, h - 2)
         self._cr.stroke()
         self._cr.restore()

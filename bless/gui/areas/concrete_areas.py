@@ -90,31 +90,44 @@ class GroupedArea(Area):
         ry = row * self.drawer.height + self.y
         roffset = ag.offset + row * self.bpr + start_byte
         odd = ((roffset // self.bpr) % 2) == 1
-        back_even = self.drawer.get_background_color(RowType.Even, HighlightType.Normal)
-        back_odd  = self.drawer.get_background_color(RowType.Odd,  HighlightType.Normal)
-
-        if blank:
-            self._fill_rect(back_odd if odd else back_even, rx, ry, self.width, self.drawer.height)
 
         if count <= 0:
             return
 
-        # Advance rx to the start_byte column position
+        dw = self.drawer.width
+        dh = self.drawer.height
+
+        # Advance rx to start_byte column position
         for skip in range(start_byte):
-            w_step = ((self.dpb + 1) * self.drawer.width
+            w_step = ((self.dpb + 1) * dw
                       if skip % self._grouping == self._grouping - 1
-                      else self.dpb * self.drawer.width)
+                      else self.dpb * dw)
             rx += w_step
 
-        row_type = RowType.Odd if odd else RowType.Even
+        # Compute total pixel span of the highlighted bytes (including gaps)
+        span_rx = rx
         for pos in range(start_byte, start_byte + count):
-            self.drawer.draw_highlight(self._cr, rx, ry,
+            w_step = ((self.dpb + 1) * dw
+                      if pos % self._grouping == self._grouping - 1
+                      else self.dpb * dw)
+            span_rx += w_step
+
+        # Fill the whole span with highlight background first
+        back = self.drawer.get_background_color(
+            RowType.Odd if odd else RowType.Even, ht)
+        self._fill_rect(back, rx, ry, span_rx - rx, dh)
+
+        # Now redraw each glyph with the highlight surface
+        row_type = RowType.Odd if odd else RowType.Even
+        cur_rx = rx
+        for pos in range(start_byte, start_byte + count):
+            self.drawer.draw_highlight(self._cr, cur_rx, ry,
                                        ag.get_cached_byte(roffset), row_type, ht)
             roffset += 1
-            w_step = ((self.dpb + 1) * self.drawer.width
+            w_step = ((self.dpb + 1) * dw
                       if pos % self._grouping == self._grouping - 1
-                      else self.dpb * self.drawer.width)
-            rx += w_step
+                      else self.dpb * dw)
+            cur_rx += w_step
 
     def calc_width(self, n: int, force: bool = False) -> int:
         if n == 0:
@@ -187,7 +200,6 @@ class HexArea(GroupedArea):
             hex_val = key - _Gdk.KEY_a + 10
         elif _Gdk.KEY_KP_0 <= key <= _Gdk.KEY_KP_9:
             hex_val = key - _Gdk.KEY_KP_0
-
         if hex_val == -1 or ag.buffer is None:
             return False
 
@@ -196,36 +208,29 @@ class HexArea(GroupedArea):
         at_end = off >= buf.size
 
         if overwrite and not at_end:
-            # OVR: read current byte, replace one nibble, write back
+            # OVR: replace one nibble in place
             orig = buf[off]
-            hi = (orig >> 4) & 0xF
-            lo = orig & 0xF
             if self._cursor_digit == 0:
-                hi = hex_val
+                new_byte = (hex_val << 4) | (orig & 0x0F)
             else:
-                lo = hex_val
-            buf.replace(off, off, bytes([hi * 16 + lo]))
+                new_byte = (orig & 0xF0) | hex_val
+            buf.replace(off, off, bytes([new_byte]))
         else:
-            # INS: on first digit insert a new byte, on second digit modify it
+            # INS mode
             if self._cursor_digit == 0:
-                # Insert new byte; high nibble set, low nibble = 0
+                # First nibble: insert a new byte with the high nibble set
                 new_byte = hex_val << 4
                 if at_end:
                     buf.append(bytes([new_byte]), 0, 1)
                 else:
                     buf.insert(off, bytes([new_byte]), 0, 1)
             else:
-                # Second nibble: modify the byte we just inserted
+                # Second nibble: set low nibble of the byte at cursor
                 if not at_end:
                     orig = buf[off]
-                    new_byte = (orig & 0xF0) | (hex_val & 0x0F)
+                    new_byte = (orig & 0xF0) | hex_val
                     buf.replace(off, off, bytes([new_byte]))
-                    return True  # don't advance cursor after second nibble here
-                # At end with second digit: just update
-                if buf.size > 0:
-                    orig = buf[buf.size - 1]
-                    new_byte = (orig & 0xF0) | (hex_val & 0x0F)
-                    buf.replace(buf.size - 1, buf.size - 1, bytes([new_byte]))
+                # Cursor will advance via _key_right in _key_default
         return True
 
 

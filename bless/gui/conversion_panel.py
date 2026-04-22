@@ -116,7 +116,7 @@ class ConversionPanel(Gtk.ScrolledWindow):
             self._clear()
             return
         buf    = dv.buffer
-        offset = dv.cursor_offset
+        offset = max(0, min(dv.cursor_offset, buf.size - 1)) if buf.size > 0 else 0
         n = min(8, max(0, buf.size - offset))
         raw = bytearray(n)
         for i in range(n):

@@ -14,6 +14,7 @@ from .areas.area_group import AreaGroup
 from .areas.concrete_areas import HexArea, AsciiArea, OffsetArea, SeparatorArea
 from .conversion_panel import ConversionPanel
 from .find_bar import FindBar, FindReplaceBar
+from .goto_offset import GotoOffsetBar
 
 if TYPE_CHECKING:
     from .data_view import DataView
@@ -70,9 +71,10 @@ class DataViewDisplay(Gtk.Box):
         self._file_changed_bar.add_button("Reload", Gtk.ResponseType.YES)
         self._file_changed_bar.connect("response", self._on_file_changed_response)
 
-        # ── Find / replace bars ───────────────────────────────────────
-        self._find_bar     = FindBar()
+        # ── Find / replace / goto bars ────────────────────────────────
+        self._find_bar         = FindBar()
         self._find_replace_bar = FindReplaceBar()
+        self._goto_bar         = GotoOffsetBar()
 
         # ── Conversion panel ──────────────────────────────────────────
         self._conv_panel = ConversionPanel()
@@ -84,6 +86,7 @@ class DataViewDisplay(Gtk.Box):
         self.pack_start(hex_row,               True,  True,  0)
         self.pack_start(self._find_bar,         False, False, 0)
         self.pack_start(self._find_replace_bar, False, False, 0)
+        self.pack_start(self._goto_bar,         False, False, 0)
         self.pack_start(sep,                    False, False, 0)
         self.pack_start(self._conv_panel,       False, False, 0)
 
@@ -109,9 +112,10 @@ class DataViewDisplay(Gtk.Box):
 
         self.show_all()
         self._file_changed_bar.hide()
-        # These bars start hidden; revealed by Ctrl+F / Ctrl+H
+        # These bars start hidden; revealed by keyboard shortcuts
         self._find_bar.hide()
         self._find_replace_bar.hide()
+        self._goto_bar.hide()
 
     # ------------------------------------------------------------------
     # Properties
@@ -271,6 +275,15 @@ class DataViewDisplay(Gtk.Box):
     def show_file_changed_bar(self) -> None:
         self._file_changed_bar.show_all()
 
+    @property
+    def goto_bar(self) -> GotoOffsetBar:
+        return self._goto_bar
+
+    def show_goto(self) -> None:
+        self._find_bar.hide()
+        self._find_replace_bar.hide()
+        self._goto_bar.show_bar()
+
     def show_find(self) -> None:
         self._find_replace_bar.hide()
         self._find_bar.show_bar()
@@ -334,6 +347,9 @@ class DataViewDisplay(Gtk.Box):
             return True
         if ctrl and event.keyval in (Gdk.KEY_h, Gdk.KEY_H):
             self.show_find_replace()
+            return True
+        if ctrl and event.keyval in (Gdk.KEY_g, Gdk.KEY_G):
+            self.show_goto()
             return True
         if self._control:
             return self._control.on_key_press(widget, event)

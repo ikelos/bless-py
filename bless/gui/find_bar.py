@@ -34,6 +34,14 @@ def _parse(text: str, fmt: str) -> Optional[bytes]:
         return None
 
 
+def _make_fmt_combo() -> Gtk.ComboBoxText:
+    cb = Gtk.ComboBoxText()
+    for f in _BASE_MAP:
+        cb.append_text(f)
+    cb.set_active(0)
+    return cb
+
+
 class _BaseBar(Gtk.Box):
     """Shared infrastructure: a dismissible horizontal bar."""
 
@@ -65,14 +73,9 @@ class _BaseBar(Gtk.Box):
         color = "red" if error else "#006600"
         self._status.set_markup(f'<span foreground="{color}">{msg}</span>')
 
-    def _make_fmt_combo(self) -> Gtk.ComboBoxText:
-        cb = Gtk.ComboBoxText()
-        for f in _BASE_MAP:
-            cb.append_text(f)
-        cb.set_active(0)
-        return cb
-
-    def _do_find(self, text: str, fmt: str, forward: bool = True) -> None:
+    def _do_find(self, text: str, fmt: str, forward: bool = True,
+                 on_found=None) -> None:
+        """Start an async search.  Optional on_found(match) called on success."""
         dv = self._dv
         if dv is None or dv.buffer is None:
             self._set_status("No file open.", error=True)
@@ -85,7 +88,6 @@ class _BaseBar(Gtk.Box):
             self._set_status("Empty pattern.", error=True)
             return
 
-        # Cancel any in-flight search
         if self._op is not None:
             self._op.cancel()
 
@@ -96,7 +98,6 @@ class _BaseBar(Gtk.Box):
 
         def _done(op: FindOperation) -> None:
             def _idle():
-                # re-check dv is still valid
                 if self._dv is None:
                     return False
                 if op.match:
@@ -104,6 +105,8 @@ class _BaseBar(Gtk.Box):
                     self._dv.move_cursor(op.match.end + 1, 0)
                     self._dv.display.make_offset_visible(op.match.start, "start")
                     self._set_status(f"Found at 0x{op.match.start:X}.")
+                    if on_found:
+                        on_found(op.match)
                 else:
                     self._set_status("Not found.", error=True)
                 return False
@@ -127,7 +130,7 @@ class FindBar(_BaseBar):
         self._entry.connect("key-press-event", self._on_entry_key)
         self.pack_start(self._entry, False, False, 0)
 
-        self._fmt = self._make_fmt_combo()
+        self._fmt = _make_fmt_combo()
         self.pack_start(self._fmt, False, False, 0)
 
         btn_prev = Gtk.Button(label="← Prev")
@@ -138,7 +141,6 @@ class FindBar(_BaseBar):
         btn_next.connect("clicked", lambda _: self._search(forward=True))
         self.pack_start(btn_next, False, False, 0)
 
-        # Hidden at startup — show via show_bar()
         self.set_no_show_all(True)
 
     def show_bar(self) -> None:
@@ -162,7 +164,10 @@ class FindBar(_BaseBar):
 
 
 class FindReplaceBar(_BaseBar):
-    """Two-row find+replace bar (Ctrl+H)."""
+    """Two-row find+replace bar (Ctrl+H).
+    Each field has its own format combo so hex can be found and replaced
+    with ASCII (or any other combination).
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -181,14 +186,15 @@ class FindReplaceBar(_BaseBar):
         inner.attach(self._find_entry,    1, 0, 1, 1)
         inner.attach(self._replace_entry, 1, 1, 1, 1)
 
-        self._fmt = self._make_fmt_combo()
-        inner.attach(self._fmt, 2, 0, 1, 2)
+        # Separate format combo for find and replace
+        self._find_fmt    = _make_fmt_combo()
+        self._replace_fmt = _make_fmt_combo()
+        inner.attach(self._find_fmt,    2, 0, 1, 1)
+        inner.attach(self._replace_fmt, 2, 1, 1, 1)
 
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         for label, cb in (
-            ("Next →",      lambda _: self._do_find(
-                self._find_entry.get_text(),
-                self._fmt.get_active_text() or "Hex", forward=True)),
+            ("Next →",      lambda _: self._search_next()),
             ("Replace",     lambda _: self._replace_one()),
             ("Replace All", lambda _: self._replace_all()),
         ):
@@ -198,9 +204,7 @@ class FindReplaceBar(_BaseBar):
 
         inner.attach(btn_box, 3, 0, 1, 2)
 
-        self._find_entry.connect("activate", lambda _: self._do_find(
-            self._find_entry.get_text(),
-            self._fmt.get_active_text() or "Hex", True))
+        self._find_entry.connect("activate", lambda _: self._search_next())
         self._find_entry.connect("key-press-event",    self._on_key)
         self._replace_entry.connect("key-press-event", self._on_key)
 
@@ -220,36 +224,61 @@ class FindReplaceBar(_BaseBar):
             return True
         return False
 
+    def _search_next(self) -> None:
+        self._do_find(self._find_entry.get_text(),
+                      self._find_fmt.get_active_text() or "Hex",
+                      forward=True)
+
     def _replace_one(self) -> None:
+        """Find next match, select it, then replace it."""
         dv = self._dv
         if dv is None or dv.buffer is None:
             return
-        sel = dv.selection
-        if sel.is_empty():
-            self._do_find(self._find_entry.get_text(),
-                          self._fmt.get_active_text() or "Hex", True)
-            return
-        repl = _parse(self._replace_entry.get_text(),
-                      self._fmt.get_active_text() or "Hex")
+        repl_text = self._replace_entry.get_text()
+        repl_fmt  = self._replace_fmt.get_active_text() or "Hex"
+        repl = _parse(repl_text, repl_fmt)
         if repl is None:
+            self._set_status("Invalid replace pattern.", error=True)
             return
-        dv.buffer.replace(sel.start, sel.end, repl)
-        dv.set_selection(-1, -1)
-        self._set_status("Replaced 1.")
-        self._do_find(self._find_entry.get_text(),
-                      self._fmt.get_active_text() or "Hex", True)
+
+        sel = dv.selection
+        find_text = self._find_entry.get_text()
+        find_fmt  = self._find_fmt.get_active_text() or "Hex"
+        find_data = _parse(find_text, find_fmt)
+        if not find_data:
+            self._set_status("Empty find pattern.", error=True)
+            return
+
+        # If the current selection already matches the find pattern, replace it
+        if (not sel.is_empty() and
+                sel.end - sel.start + 1 == len(find_data)):
+            # Verify the bytes match
+            buf = dv.buffer
+            sel_bytes = bytes(buf[sel.start + i] for i in range(len(find_data)))
+            if sel_bytes == find_data:
+                buf.replace(sel.start, sel.end, repl)
+                dv.set_selection(-1, -1)
+                dv.move_cursor(sel.start + len(repl), 0)
+                self._set_status("Replaced. Searching for next…")
+                # Search for the next occurrence
+                self._do_find(find_text, find_fmt, forward=True)
+                return
+
+        # No matching selection: find first, then the user can press Replace again
+        self._do_find(find_text, find_fmt, forward=True)
 
     def _replace_all(self) -> None:
         dv = self._dv
         if dv is None or dv.buffer is None:
             return
-        fmt  = self._fmt.get_active_text() or "Hex"
-        find = _parse(self._find_entry.get_text(), fmt)
-        repl = _parse(self._replace_entry.get_text(), fmt)
-        if not find or repl is None:
+        find_fmt  = self._find_fmt.get_active_text() or "Hex"
+        repl_fmt  = self._replace_fmt.get_active_text() or "Hex"
+        find_data = _parse(self._find_entry.get_text(), find_fmt)
+        repl_data = _parse(self._replace_entry.get_text(), repl_fmt)
+        if not find_data or repl_data is None:
             return
         strategy = BMFindStrategy()
-        strategy.pattern  = find
+        strategy.pattern  = find_data
         strategy.buffer   = dv.buffer
         strategy.position = 0
         count = 0
@@ -259,9 +288,9 @@ class FindReplaceBar(_BaseBar):
                 m = strategy.find_next()
                 if m is None:
                     break
-                dv.buffer.replace(m.start, m.end, repl)
+                dv.buffer.replace(m.start, m.end, repl_data)
                 count += 1
-                strategy.position = m.start + len(repl)
+                strategy.position = m.start + len(repl_data)
         finally:
             dv.buffer.end_action_chaining()
-        self._set_status(f"Replaced {count}.")
+        self._set_status(f"Replaced {count} occurrence(s).")
