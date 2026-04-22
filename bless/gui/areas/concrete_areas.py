@@ -58,24 +58,27 @@ class GroupedArea(Area):
         if blank:
             self._fill_rect(back_odd if odd else back_even, rx, ry, self.width, self.drawer.height)
 
+        if count <= 0:
+            return
+
+        # Advance rx to the start_byte column position
+        for skip in range(start_byte):
+            w_step = ((self.dpb + 1) * self.drawer.width
+                      if skip % self._grouping == self._grouping - 1
+                      else self.dpb * self.drawer.width)
+            rx += w_step
+
         row_type = RowType.Odd if odd else RowType.Even
-        pos = 0
-        n = count
-        while True:
-            if pos >= start_byte:
-                col_type = (ColumnType.Even if (pos // self._grouping) % 2 == 0
-                            else ColumnType.Odd)
-                self.drawer.draw_normal(self._cr, rx, ry,
-                                        ag.get_cached_byte(roffset), row_type, col_type)
-                roffset += 1
-                n -= 1
-                if n <= 0:
-                    break
+        for pos in range(start_byte, start_byte + count):
+            col_type = (ColumnType.Even if (pos // self._grouping) % 2 == 0
+                        else ColumnType.Odd)
+            self.drawer.draw_normal(self._cr, rx, ry,
+                                    ag.get_cached_byte(roffset), row_type, col_type)
+            roffset += 1
             w_step = ((self.dpb + 1) * self.drawer.width
                       if pos % self._grouping == self._grouping - 1
                       else self.dpb * self.drawer.width)
             rx += w_step
-            pos += 1
 
     def _render_row_highlight(self, row: int, start_byte: int,
                                count: int, blank: bool,
@@ -93,22 +96,25 @@ class GroupedArea(Area):
         if blank:
             self._fill_rect(back_odd if odd else back_even, rx, ry, self.width, self.drawer.height)
 
+        if count <= 0:
+            return
+
+        # Advance rx to the start_byte column position
+        for skip in range(start_byte):
+            w_step = ((self.dpb + 1) * self.drawer.width
+                      if skip % self._grouping == self._grouping - 1
+                      else self.dpb * self.drawer.width)
+            rx += w_step
+
         row_type = RowType.Odd if odd else RowType.Even
-        pos = 0
-        n = count
-        while True:
-            if pos >= start_byte:
-                self.drawer.draw_highlight(self._cr, rx, ry,
-                                           ag.get_cached_byte(roffset), row_type, ht)
-                roffset += 1
-                n -= 1
-                if n <= 0:
-                    break
+        for pos in range(start_byte, start_byte + count):
+            self.drawer.draw_highlight(self._cr, rx, ry,
+                                       ag.get_cached_byte(roffset), row_type, ht)
+            roffset += 1
             w_step = ((self.dpb + 1) * self.drawer.width
                       if pos % self._grouping == self._grouping - 1
                       else self.dpb * self.drawer.width)
             rx += w_step
-            pos += 1
 
     def calc_width(self, n: int, force: bool = False) -> int:
         if n == 0:
@@ -237,11 +243,10 @@ class AsciiArea(Area):
             back = self.drawer.get_background_color(
                 RowType.Odd if odd else RowType.Even, HighlightType.Normal)
             self._fill_rect(back, rx, ry, self.width, self.drawer.height)
+        if count <= 0:
+            return
         row_type = RowType.Odd if odd else RowType.Even
-        pos = 0
-        while pos < start_byte:
-            rx += self.drawer.width
-            pos += 1
+        rx += start_byte * self.drawer.width
         for _ in range(count):
             self.drawer.draw_normal(self._cr, rx, ry,
                                     ag.get_cached_byte(roffset), row_type, ColumnType.Even)
@@ -325,19 +330,31 @@ class OffsetArea(Area):
         super().realize()
 
     def _render_extra(self) -> None:
-        if self.bpr <= 0 or not self.drawer:
+        if self.bpr <= 0 or not self.drawer or self.drawer.height <= 0:
             return
         ag = self.area_group
         buf_size = ag.buffer.size if ag.buffer else 0
         nrows = self.height // self.drawer.height
-        bleft = nrows * self.bpr
-        if bleft + ag.offset > buf_size:
-            bleft = buf_size - ag.offset + 1
-        full_rows = bleft // self.bpr
-        if bleft % self.bpr:
+
+        if buf_size == 0:
+            # Render one blank row to show the offset column even on empty files
+            for i in range(nrows):
+                self._render_row_normal(i, 0, 0, True)
+            return
+
+        visible_bytes = nrows * self.bpr
+        if ag.offset + visible_bytes > buf_size:
+            visible_bytes = buf_size - ag.offset + 1
+        visible_bytes = max(visible_bytes, 0)
+
+        full_rows = visible_bytes // self.bpr
+        if visible_bytes % self.bpr:
             full_rows += 1
         for i in range(full_rows):
             self._render_row_normal(i, 0, self.bpr, True)
+        # fill remaining rows with blank background
+        for i in range(full_rows, nrows):
+            self._render_row_normal(i, 0, 0, True)
 
     def _render_row_normal(self, row: int, start_byte: int,
                            count: int, blank: bool) -> None:

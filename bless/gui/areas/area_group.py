@@ -89,7 +89,32 @@ class AreaGroup:
 
     @focused_area.setter
     def focused_area(self, area: Optional["Area"]) -> None:
+        # Remove cursor focus from every area first
+        for a in self._areas:
+            a._cursor_focus = False
         self._focused_area = area
+        if area is not None:
+            area._cursor_focus = True
+        self.redraw_now()
+
+    def set_initial_focus(self) -> None:
+        """Give cursor focus to the first focusable area."""
+        for a in self._areas:
+            if a.can_focus:
+                self.focused_area = a
+                return
+
+    def cycle_focus(self) -> None:
+        """Move cursor focus to the next focusable area (Tab key)."""
+        focusable = [a for a in self._areas if a.can_focus]
+        if not focusable:
+            return
+        if self._focused_area in focusable:
+            idx = focusable.index(self._focused_area)
+            nxt = focusable[(idx + 1) % len(focusable)]
+        else:
+            nxt = focusable[0]
+        self.focused_area = nxt
 
     @property
     def offset(self) -> int:

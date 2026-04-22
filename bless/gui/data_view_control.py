@@ -386,36 +386,35 @@ class DataViewControl:
         if not dv.buffer.is_resizable and not dv.overwrite:
             return False
 
+        consumed = False
         if dv.selection.is_empty():
             if (self._im_context.filter_keypress(event)
                     and fa.handle_key(event.keyval, dv.overwrite)):
+                consumed = True
                 self._key_right(cur, nxt)
                 from .data_view import CursorState
                 dv.cursor_undo_deque.appendleft(
                     CursorState(cur.second, cur.digit, nxt.second, nxt.digit))
                 dv.cursor_redo_deque.clear()
                 self._sel_start = self._sel_end = nxt.copy()
-                return True
-            return False
         else:
             dv.buffer.begin_action_chaining()
             try:
-                consumed = (self._im_context.filter_keypress(event)
-                            and fa.handle_key(event.keyval, False))
-                if consumed:
+                if (self._im_context.filter_keypress(event)
+                        and fa.handle_key(event.keyval, False)):
+                    consumed = True
                     cur_sel = dv.selection
-                    c_off   = dv.cursor_offset
                     self._key_right(cur, nxt)
                     nxt.first = nxt.second = cur_sel.start
                     self._sel_end = self._sel_start = nxt.copy()
-                    if c_off > cur_sel.end:
+                    if dv.cursor_offset > cur_sel.end:
                         dv.delete()
                     else:
                         dv.set_selection(cur_sel.start + 1, cur_sel.end + 1)
                         dv.delete()
             finally:
                 dv.buffer.end_action_chaining()
-            return consumed if 'consumed' in dir() else False
+        return consumed
 
     # ------------------------------------------------------------------
     # Cleanup

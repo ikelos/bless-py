@@ -122,6 +122,10 @@ class DataViewDisplay(Gtk.Box):
     # ------------------------------------------------------------------
 
     def _find_best_bpr(self, width: int) -> int:
+        # Bail early if areas haven't been realized yet (no drawers)
+        if not self._area_group.areas or not self._area_group.areas[0].drawer:
+            return 16  # sensible default
+
         n = 1
         best = 1
         while True:
@@ -148,7 +152,7 @@ class DataViewDisplay(Gtk.Box):
 
         # Snap offset to row boundary
         ag = self._area_group
-        if ag.offset % bpr != 0:
+        if bpr > 0 and ag.offset % bpr != 0:
             ag.offset = (ag.offset // bpr) * bpr
 
         x = 0
@@ -158,13 +162,16 @@ class DataViewDisplay(Gtk.Box):
             a.width  = a.calc_width(bpr, force=True)
             a.x      = x
             a.height = win_h
-            x += a.width
-            if a.drawer and a.drawer.height < font_h:
+            x += max(a.width, 0)
+            if a.drawer and a.drawer.height < font_h and a.drawer.height > 0:
                 font_h = a.drawer.height
 
+        if font_h <= 0:
+            font_h = 16
+
         adj = self._vscroll.get_adjustment()
-        adj.set_page_size(win_h // font_h if font_h else 10)
-        self._vscroll.set_increments(3, adj.get_page_size() - 1)
+        adj.set_page_size(win_h // font_h)
+        self._vscroll.set_increments(3, max(1, adj.get_page_size() - 1))
 
         self._setup_scrollbar_range(bpr)
 
@@ -263,6 +270,9 @@ class DataViewDisplay(Gtk.Box):
         self._realized = True
         alloc = widget.get_allocation()
         self._resize(alloc.width, alloc.height)
+        # Give focus to first focusable area (hex column by default)
+        self._area_group.set_initial_focus()
+        widget.queue_draw()
 
     def _on_drawn(self, widget, cr) -> None:
         self._area_group.draw(cr)
@@ -272,6 +282,7 @@ class DataViewDisplay(Gtk.Box):
             return
         self._resize(event.width, event.height)
         self.make_offset_visible(self._dv.offset, "start")
+        widget.queue_draw()
 
     def _on_scrolled(self, adj) -> None:
         bpr = 0

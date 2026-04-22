@@ -62,7 +62,7 @@ class DrawerInfo:
 
     def __init__(self) -> None:
         self.font_name = "Courier 12"
-        self.font_language = "utf-8"
+        self.font_language = "en"   # BCP-47 tag; empty string = system default
         self.uppercase = False
 
         self.fg_normal:    list[list[Optional[Gdk.RGBA]]] = [
@@ -117,7 +117,8 @@ class Drawer:
         info.setup_highlight(widget)
 
         fd = Pango.FontDescription.from_string(info.font_name)
-        ctx = widget.get_pango_context()
+        # create_pango_context() gives us a fresh context we can modify safely
+        ctx = widget.create_pango_context()
         ctx.set_font_description(fd)
         lang = Pango.Language.from_string(info.font_language)
         ctx.set_language(lang)

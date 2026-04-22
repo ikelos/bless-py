@@ -3,18 +3,20 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 from collections import deque
-from typing import Optional, Callable, TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gdk, GLib, Gtk
 
 from ..buffers.byte_buffer import ByteBuffer
-from ..util.range import Range
 from ..util.base_converter import byte_array_to_string, string_to_byte_array
-from .areas.area_group import AreaGroup
+from ..util.range import Range
 
 if TYPE_CHECKING:
     from .areas.area import Area
@@ -25,13 +27,14 @@ DataViewHandler = Callable[["DataView"], None]
 
 class CursorState:
     """Records cursor positions before/after a mutation for undo/redo."""
+
     __slots__ = ("undo_offset", "undo_digit", "redo_offset", "redo_digit")
 
     def __init__(self, uo: int, ud: int, ro: int, rd: int) -> None:
         self.undo_offset = uo
-        self.undo_digit  = ud
+        self.undo_digit = ud
         self.redo_offset = ro
-        self.redo_digit  = rd
+        self.redo_digit = rd
 
 
 class DataView:
@@ -44,15 +47,15 @@ class DataView:
     """
 
     def __init__(self) -> None:
-        from .data_view_display import DataViewDisplay
         from .data_view_control import DataViewControl
+        from .data_view_display import DataViewDisplay
 
         self._dv_display = DataViewDisplay(self)
         self._dv_control = DataViewControl(self)
         self._dv_display.control = self._dv_control
         self._dv_control.display = self._dv_display
 
-        self._buffer: Optional[ByteBuffer] = None
+        self._buffer: ByteBuffer | None = None
         self._overwrite: bool = False
         self._notification: bool = False
         self._clipdata: bytes = b""
@@ -63,39 +66,45 @@ class DataView:
         self._cursor_redo: deque[CursorState] = deque()
 
         # event lists
-        self._buffer_changed_handlers:      list[DataViewHandler] = []
-        self._selection_changed_handlers:   list[DataViewHandler] = []
-        self._cursor_changed_handlers:      list[DataViewHandler] = []
-        self._overwrite_changed_handlers:   list[DataViewHandler] = []
+        self._buffer_changed_handlers: list[DataViewHandler] = []
+        self._selection_changed_handlers: list[DataViewHandler] = []
+        self._cursor_changed_handlers: list[DataViewHandler] = []
+        self._overwrite_changed_handlers: list[DataViewHandler] = []
         self._notification_changed_handlers: list[DataViewHandler] = []
-        self._focus_changed_handlers:       list[DataViewHandler] = []
+        self._focus_changed_handlers: list[DataViewHandler] = []
 
         # subscribe to preferences
         from ..tools.preferences import Preferences
+
         self._pref_id = f"dv{id(self)}"
-        p = Preferences.instance
-        Preferences.proxy.subscribe("Undo.Limited",      self._pref_id, lambda pr: self._on_prefs_changed(pr))
-        Preferences.proxy.subscribe("Undo.Actions",      self._pref_id, lambda pr: self._on_prefs_changed(pr))
-        Preferences.proxy.subscribe("ByteBuffer.TempDir",self._pref_id, lambda pr: self._on_prefs_changed(pr))
+        Preferences.proxy().subscribe(
+            "Undo.Limited", self._pref_id, lambda pr: self._on_prefs_changed(pr)
+        )
+        Preferences.proxy().subscribe(
+            "Undo.Actions", self._pref_id, lambda pr: self._on_prefs_changed(pr)
+        )
+        Preferences.proxy().subscribe(
+            "ByteBuffer.TempDir", self._pref_id, lambda pr: self._on_prefs_changed(pr)
+        )
 
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
 
     @property
-    def display(self) -> "DataViewDisplay":
+    def display(self) -> DataViewDisplay:
         return self._dv_display
 
     @property
-    def control(self) -> "DataViewControl":
+    def control(self) -> DataViewControl:
         return self._dv_control
 
     @property
-    def buffer(self) -> Optional[ByteBuffer]:
+    def buffer(self) -> ByteBuffer | None:
         return self._buffer
 
     @buffer.setter
-    def buffer(self, bb: Optional[ByteBuffer]) -> None:
+    def buffer(self, bb: ByteBuffer | None) -> None:
         if bb is not None:
             self._setup_buffer(bb)
         else:
@@ -139,15 +148,17 @@ class DataView:
 
     @property
     def selection(self) -> Range:
-        return Range(self._dv_display.area_group.selection.start,
-                     self._dv_display.area_group.selection.end)
+        return Range(
+            self._dv_display.area_group.selection.start,
+            self._dv_display.area_group.selection.end,
+        )
 
     @selection.setter
     def selection(self, r: Range) -> None:
         self.set_selection(r.start, r.end)
 
     @property
-    def focused_area(self) -> Optional["Area"]:
+    def focused_area(self) -> Area | None:
         return self._dv_display.area_group.focused_area
 
     @property
@@ -198,8 +209,13 @@ class DataView:
         ag.set_cursor(0, 0)
         ag.selection = Range()
 
+        # Ensure a focusable area has cursor focus
+        ag.set_initial_focus()
+
         self._dv_display.redraw()
         self._dv_display.vscroll.set_value(0)
+        # Force a redraw even if the widget was already realized
+        self._dv_display._drawing_area.queue_draw()
 
         self._on_prefs_changed(None)
         for h in self._buffer_changed_handlers:
@@ -220,6 +236,7 @@ class DataView:
             if self._buffer and self._buffer.read_allowed:
                 self._dv_display.area_group.redraw_now()
             return False
+
         GLib.idle_add(_idle)
 
     def _on_buffer_file_changed(self, bb: ByteBuffer) -> None:
@@ -229,13 +246,15 @@ class DataView:
             if self._buffer:
                 self._buffer.file_ops_allowed = False
             return False
+
         GLib.idle_add(_idle)
 
     def _on_prefs_changed(self, prefs) -> None:
         if self._buffer is None:
             return
         from ..tools.preferences import Preferences
-        p = Preferences.instance
+
+        p = Preferences.instance()
         if p["Undo.Limited"] == "True":
             try:
                 max_a = int(p["Undo.Actions"])
@@ -286,8 +305,7 @@ class DataView:
     def _delete_selection_internal(self) -> None:
         ag = self._dv_display.area_group
         prev = self.selection
-        self._add_undo_cursor(
-            CursorState(ag.cursor_offset, 0, ag.selection.start, 0))
+        self._add_undo_cursor(CursorState(ag.cursor_offset, 0, ag.selection.start, 0))
         self._cursor_redo.clear()
         self.move_cursor(ag.selection.start, 0)
         self.set_selection(-1, -1)
@@ -306,9 +324,12 @@ class DataView:
 
     def cut(self) -> None:
         ag = self._dv_display.area_group
-        if (not ag.areas or not self._buffer
-                or not self._buffer.modify_allowed
-                or not self._buffer.is_resizable):
+        if (
+            not ag.areas
+            or not self._buffer
+            or not self._buffer.modify_allowed
+            or not self._buffer.is_resizable
+        ):
             return
         ba = self._buffer.range_to_bytes(ag.selection.start, ag.selection.end)
         if ba is None:
@@ -331,21 +352,20 @@ class DataView:
 
         if ag.selection.is_empty():
             if self._overwrite and ag.cursor_offset < self._buffer.size:
-                end_pos = min(ag.cursor_offset + len(data) - 1,
-                              self._buffer.size - 1)
+                end_pos = min(ag.cursor_offset + len(data) - 1, self._buffer.size - 1)
                 self._buffer.replace(ag.cursor_offset, end_pos, data)
             else:
                 self._buffer.insert(ag.cursor_offset, data, 0, len(data))
             self._add_undo_cursor(
-                CursorState(ag.cursor_offset, 0,
-                            ag.cursor_offset + len(data), 0))
+                CursorState(ag.cursor_offset, 0, ag.cursor_offset + len(data), 0)
+            )
             self._cursor_redo.clear()
             self.move_cursor(ag.cursor_offset + len(data), 0)
         else:
             self._buffer.replace(ag.selection.start, ag.selection.end, data)
             self._add_undo_cursor(
-                CursorState(ag.selection.start, 0,
-                            ag.selection.start + len(data), 0))
+                CursorState(ag.selection.start, 0, ag.selection.start + len(data), 0)
+            )
             self._cursor_redo.clear()
             self.move_cursor(ag.selection.start + len(data), 0)
             self.set_selection(-1, -1)
@@ -360,8 +380,13 @@ class DataView:
             if ag.cursor_offset < self._buffer.size:
                 self._buffer.delete(ag.cursor_offset, ag.cursor_offset)
                 self._add_undo_cursor(
-                    CursorState(ag.cursor_offset, ag.cursor_digit,
-                                ag.cursor_offset, ag.cursor_digit))
+                    CursorState(
+                        ag.cursor_offset,
+                        ag.cursor_digit,
+                        ag.cursor_offset,
+                        ag.cursor_digit,
+                    )
+                )
                 self._cursor_redo.clear()
         else:
             self._delete_selection_internal()
@@ -377,7 +402,8 @@ class DataView:
                 self.move_cursor(c - 1, ag.cursor_digit)
                 self._buffer.delete(c - 1, c - 1)
                 self._add_undo_cursor(
-                    CursorState(c, ag.cursor_digit, c - 1, ag.cursor_digit))
+                    CursorState(c, ag.cursor_digit, c - 1, ag.cursor_digit)
+                )
                 self._cursor_redo.clear()
         else:
             self._delete_selection_internal()
@@ -425,8 +451,7 @@ class DataView:
     def _set_clipboard_data(self) -> None:
         data = self._clipdata
         atype = self._area_type()
-        base_map = {"hexadecimal": 16, "decimal": 10,
-                    "octal": 8, "binary": 2}
+        base_map = {"hexadecimal": 16, "decimal": 10, "octal": 8, "binary": 2}
 
         def get_func(cb, sel, info, _data):
             target = sel.get_target().name()
@@ -445,18 +470,17 @@ class DataView:
         ]
         self._clipboard.set_with_data(targets, get_func, lambda *a: None)
 
-    def _get_paste_data(self) -> Optional[bytes]:
+    def _get_paste_data(self) -> bytes | None:
         atype = self._area_type()
-        base_map = {"hexadecimal": 16, "decimal": 10,
-                    "octal": 8, "binary": 2}
+        base_map = {"hexadecimal": 16, "decimal": 10, "octal": 8, "binary": 2}
 
         sd = self._clipboard.wait_for_contents(
-            Gdk.Atom.intern("application/octet-stream", False))
+            Gdk.Atom.intern("application/octet-stream", False)
+        )
         if sd:
             return bytes(sd.get_data())
 
-        sd = self._clipboard.wait_for_contents(
-            Gdk.Atom.intern("UTF8_STRING", False))
+        sd = self._clipboard.wait_for_contents(Gdk.Atom.intern("UTF8_STRING", False))
         if sd:
             text = sd.get_text()
             if text:
@@ -476,7 +500,8 @@ class DataView:
     def cleanup(self) -> None:
         self.buffer = None
         from ..tools.preferences import Preferences
+
         for key in ("Undo.Limited", "Undo.Actions", "ByteBuffer.TempDir"):
-            Preferences.proxy.unsubscribe(key, self._pref_id)
+            Preferences.proxy().unsubscribe(key, self._pref_id)
         self._dv_display.cleanup()
         self._dv_control.cleanup()

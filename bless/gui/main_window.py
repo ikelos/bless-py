@@ -3,20 +3,21 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 import os
 import sys
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gdk, Gio, GLib, Gtk
 
-from ..buffers.byte_buffer import ByteBuffer
+from ..tools.preferences import Preferences
 from .data_book import DataBook
 from .data_view import DataView
 from .plugins.file_operations import FileOperations
 from .plugins.find_replace import FindReplaceDialog
-from ..tools.preferences import Preferences
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -33,21 +34,27 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_icon_name("accessories-text-editor")
 
         self._data_book = DataBook()
-        self._file_ops  = FileOperations(self._data_book, self)
+        self._file_ops = FileOperations(self._data_book, self)
         self._find_dlg: FindReplaceDialog | None = None
+        self._initial_files = list(files) if files else []
 
         self._build_ui()
         self._wire_events()
         self._load_prefs()
 
-        # Open files from command line
-        if files:
-            for f in files:
+        self.show_all()
+
+        # Defer file-open until after GTK has realized all child widgets
+        GLib.idle_add(self._open_initial_files)
+
+    def _open_initial_files(self) -> bool:
+        """Idle callback: open files after all widgets have been realized."""
+        if self._initial_files:
+            for f in self._initial_files:
                 self._file_ops.open_file(f)
         else:
             self._file_ops.new_file()
-
-        self.show_all()
+        return False  # don't repeat
 
     # ------------------------------------------------------------------
     # UI construction
@@ -79,14 +86,14 @@ class MainWindow(Gtk.ApplicationWindow):
         # File menu
         file_menu = Gtk.Menu()
         for label, cb in (
-            ("_New",          lambda *_: self._file_ops.new_file()),
-            ("_Open…",        lambda *_: self._file_ops.open_file()),
-            ("_Save",         lambda *_: self._file_ops.save_file()),
-            ("Save _As…",     lambda *_: self._file_ops.save_file_as()),
-            ("_Revert",       lambda *_: self._file_ops.revert_file()),
+            ("_New", lambda *_: self._file_ops.new_file()),
+            ("_Open…", lambda *_: self._file_ops.open_file()),
+            ("_Save", lambda *_: self._file_ops.save_file()),
+            ("Save _As…", lambda *_: self._file_ops.save_file_as()),
+            ("_Revert", lambda *_: self._file_ops.revert_file()),
             (None, None),
-            ("_Close",        lambda *_: self._file_ops.close_file()),
-            ("_Quit",         lambda *_: self.get_application().quit()),
+            ("_Close", lambda *_: self._file_ops.close_file()),
+            ("_Quit", lambda *_: self.get_application().quit()),
         ):
             if label is None:
                 file_menu.append(Gtk.SeparatorMenuItem())
@@ -101,15 +108,15 @@ class MainWindow(Gtk.ApplicationWindow):
         # Edit menu
         edit_menu = Gtk.Menu()
         for label, cb in (
-            ("_Undo",         lambda *_: self._current_dv_call("undo")),
-            ("_Redo",         lambda *_: self._current_dv_call("redo")),
+            ("_Undo", lambda *_: self._current_dv_call("undo")),
+            ("_Redo", lambda *_: self._current_dv_call("redo")),
             (None, None),
-            ("Cu_t",          lambda *_: self._current_dv_call("cut")),
-            ("_Copy",         lambda *_: self._current_dv_call("copy")),
-            ("_Paste",        lambda *_: self._current_dv_call("paste")),
-            ("_Delete",       lambda *_: self._current_dv_call("delete")),
+            ("Cu_t", lambda *_: self._current_dv_call("cut")),
+            ("_Copy", lambda *_: self._current_dv_call("copy")),
+            ("_Paste", lambda *_: self._current_dv_call("paste")),
+            ("_Delete", lambda *_: self._current_dv_call("delete")),
             (None, None),
-            ("Select _All",   lambda *_: self._select_all()),
+            ("Select _All", lambda *_: self._select_all()),
         ):
             if label is None:
                 edit_menu.append(Gtk.SeparatorMenuItem())
@@ -145,25 +152,26 @@ class MainWindow(Gtk.ApplicationWindow):
         tb = Gtk.Toolbar()
         tb.set_style(Gtk.ToolbarStyle.ICONS)
         for icon, tooltip, cb in (
-            ("document-new",  "New",     lambda *_: self._file_ops.new_file()),
-            ("document-open", "Open",    lambda *_: self._file_ops.open_file()),
-            ("document-save", "Save",    lambda *_: self._file_ops.save_file()),
+            ("document-new", "New", lambda *_: self._file_ops.new_file()),
+            ("document-open", "Open", lambda *_: self._file_ops.open_file()),
+            ("document-save", "Save", lambda *_: self._file_ops.save_file()),
             (None, None, None),
-            ("edit-cut",      "Cut",     lambda *_: self._current_dv_call("cut")),
-            ("edit-copy",     "Copy",    lambda *_: self._current_dv_call("copy")),
-            ("edit-paste",    "Paste",   lambda *_: self._current_dv_call("paste")),
+            ("edit-cut", "Cut", lambda *_: self._current_dv_call("cut")),
+            ("edit-copy", "Copy", lambda *_: self._current_dv_call("copy")),
+            ("edit-paste", "Paste", lambda *_: self._current_dv_call("paste")),
             (None, None, None),
-            ("edit-undo",     "Undo",    lambda *_: self._current_dv_call("undo")),
-            ("edit-redo",     "Redo",    lambda *_: self._current_dv_call("redo")),
+            ("edit-undo", "Undo", lambda *_: self._current_dv_call("undo")),
+            ("edit-redo", "Redo", lambda *_: self._current_dv_call("redo")),
             (None, None, None),
-            ("edit-find",     "Find",    lambda *_: self._show_find_dialog()),
+            ("edit-find", "Find", lambda *_: self._show_find_dialog()),
         ):
             if icon is None:
                 tb.insert(Gtk.SeparatorToolItem(), -1)
             else:
                 btn = Gtk.ToolButton.new(
                     Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.SMALL_TOOLBAR),
-                    tooltip)
+                    tooltip,
+                )
                 btn.set_tooltip_text(tooltip)
                 btn.connect("clicked", cb)
                 tb.insert(btn, -1)
@@ -255,10 +263,7 @@ class MainWindow(Gtk.ApplicationWindow):
         if dv.buffer and off < dv.buffer.size:
             b = dv.buffer[off]
             val = f"  |  Value: 0x{b:02X} ({b})"
-        self._statusbar.push(
-            self._ctx,
-            f"Offset: 0x{off:08X} ({off}){val}"
-        )
+        self._statusbar.push(self._ctx, f"Offset: 0x{off:08X} ({off}){val}")
 
     def _update_title(self, dv: DataView) -> None:
         if dv is not self._data_book.current_view:
@@ -274,7 +279,7 @@ class MainWindow(Gtk.ApplicationWindow):
         prefs_dir = os.path.join(GLib.get_user_config_dir(), "bless")
         os.makedirs(prefs_dir, exist_ok=True)
         prefs_file = os.path.join(prefs_dir, "preferences.xml")
-        p = Preferences.instance
+        p = Preferences.instance()
         p.load(prefs_file)
         p.auto_save_path = prefs_file
 
@@ -283,10 +288,13 @@ class MainWindow(Gtk.ApplicationWindow):
 # Application entry-point
 # ---------------------------------------------------------------------------
 
-class BlessApplication(Gtk.Application):
 
+class BlessApplication(Gtk.Application):
     def __init__(self) -> None:
-        super().__init__(application_id="org.bless.hexeditor")
+        super().__init__(
+            application_id="org.bless.hexeditor",
+            flags=Gio.ApplicationFlags.HANDLES_OPEN,
+        )
         self._window: MainWindow | None = None
 
     def do_activate(self) -> None:

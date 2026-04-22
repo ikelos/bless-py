@@ -144,12 +144,12 @@ class Area(ABC):
     def _render_extra(self) -> None:
         """Render all rows (normal mode)."""
         ag = self.area_group
+        if self.drawer is None or self.drawer.height <= 0 or self.height <= 0:
+            return
         buf_size = ag.buffer.size if ag.buffer else 0
         nrows = self.height // self.drawer.height
         visible = nrows * self.bpr
-
-        if visible + ag.offset > buf_size:
-            visible = buf_size - ag.offset + 1
+        visible = max(0, min(visible, buf_size - ag.offset + 1))
 
         full_rows = visible // self.bpr
         last_row_bytes = visible % self.bpr
@@ -159,6 +159,11 @@ class Area(ABC):
         for i in range(full_rows):
             n = self.bpr if i < full_rows - 1 or last_row_bytes == 0 else last_row_bytes
             self._render_row_normal(i, 0, n, True)
+
+        # Fill remainder of window with blank background
+        if self.drawer:
+            for i in range(full_rows, nrows):
+                self._render_row_normal(i, 0, 0, True)
 
     def _render_highlights(self) -> None:
         ag = self.area_group
@@ -175,11 +180,17 @@ class Area(ABC):
         if not self._cursor_focus or not self._can_focus:
             return
         ag = self.area_group
+        if ag.buffer is None or ag.cursor_offset > ag.buffer.size:
+            return
         row, _, cx, cy = self.get_display_info_by_offset(ag.cursor_offset)
+        # Shift right by cursor_digit so hex shows cursor on the active nibble
+        if self.drawer:
+            cx += self._cursor_digit * self.drawer.width
         color = (self._active_cursor_color if self._is_active
                  else self._inactive_cursor_color)
         if self.drawer:
-            self._fill_rect(color, cx, cy, self.drawer.width, self.drawer.height)
+            self._fill_rect(color, cx + self.x, cy + self.y,
+                            self.drawer.width, self.drawer.height)
 
     # ------------------------------------------------------------------
     # Properties
@@ -188,6 +199,10 @@ class Area(ABC):
     @property
     def can_focus(self) -> bool:
         return self._can_focus
+
+    @property
+    def has_cursor_focus(self) -> bool:
+        return self._cursor_focus
 
     @property
     def cursor_digit(self) -> int:
