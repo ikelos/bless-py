@@ -306,13 +306,8 @@ class FindOperation:
         self.match: Optional[Range] = None
         self._finished = threading.Event()
         self._thread: Optional[threading.Thread] = None
-
-        # Lock the buffer for the duration
-        buf = strategy.buffer
-        if buf:
-            buf.read_allowed = False
-            buf.modify_allowed = False
-            buf.file_ops_allowed = False
+        # We do NOT lock the buffer here: find is read-only and must not
+        # block the GTK thread from rendering while the search runs.
 
     def start(self) -> None:
         self._strategy.cancelled = False
@@ -332,11 +327,6 @@ class FindOperation:
             else:
                 self.match = self._strategy.find_previous()
         finally:
-            buf = self._strategy.buffer
-            if buf:
-                buf.read_allowed = True
-                buf.modify_allowed = True
-                buf.file_ops_allowed = True
             if self._done_cb:
                 self._done_cb(self)
             self._finished.set()

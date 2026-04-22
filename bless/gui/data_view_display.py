@@ -109,6 +109,9 @@ class DataViewDisplay(Gtk.Box):
 
         self.show_all()
         self._file_changed_bar.hide()
+        # These bars start hidden; revealed by Ctrl+F / Ctrl+H
+        self._find_bar.hide()
+        self._find_replace_bar.hide()
 
     # ------------------------------------------------------------------
     # Properties

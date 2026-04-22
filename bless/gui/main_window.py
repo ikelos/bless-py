@@ -249,27 +249,45 @@ class MainWindow(Gtk.ApplicationWindow):
     def _on_page_added(self, dv: DataView) -> None:
         dv.connect_buffer_changed(self._on_dv_buffer_changed)
         dv.connect_cursor_changed(self._on_dv_cursor_changed)
+        dv.connect_selection_changed(lambda d: self._update_statusbar(d))
+        dv.connect_overwrite_changed(lambda d: self._update_statusbar(d))
 
     def _on_switch_page(self, nb, widget, n) -> None:
         dv = self._data_book.current_view
         if dv:
             self._update_title(dv)
+            self._update_statusbar(dv)
 
     def _on_dv_buffer_changed(self, dv: DataView) -> None:
         self._update_title(dv)
+        self._update_statusbar(dv)
 
     def _on_dv_cursor_changed(self, dv: DataView) -> None:
         if dv is not self._data_book.current_view:
             return
+        self._update_statusbar(dv)
+
+    def _update_statusbar(self, dv: DataView) -> None:
+        if dv is not self._data_book.current_view:
+            return
         self._statusbar.pop(self._ctx)
-        off = dv.cursor_offset
-        val = ""
-        if dv.buffer and off < dv.buffer.size:
-            b = dv.buffer[off]
-            val = f"  |  Value: 0x{b:02X} ({b})"
+        if dv.buffer is None:
+            self._statusbar.push(self._ctx, "")
+            return
+        off  = dv.cursor_offset
+        size = dv.buffer.size
+        sel  = dv.selection
+        mode = "OVR" if dv.overwrite else "INS"
+
+        sel_str = "Selection: None"
+        if not sel.is_empty():
+            n = sel.end - sel.start + 1
+            sel_str = f"Selection: 0x{sel.start:x}–0x{sel.end:x} ({n} bytes)"
+
         self._statusbar.push(
             self._ctx,
-            f"Offset: 0x{off:08X} ({off}){val}"
+            f"Offset: 0x{off:x} / 0x{max(0,size-1):x}  |  Size: {size}  |  "
+            f"{sel_str}  |  {mode}"
         )
 
     def _update_title(self, dv: DataView) -> None:

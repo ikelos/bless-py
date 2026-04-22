@@ -177,7 +177,6 @@ class HexArea(GroupedArea):
 
     def handle_key(self, key: int, overwrite: bool) -> bool:
         ag = self.area_group
-        # Map Gdk key value to nibble 0-15
         from gi.repository import Gdk as _Gdk
         hex_val = -1
         if _Gdk.KEY_0 <= key <= _Gdk.KEY_9:
@@ -192,26 +191,41 @@ class HexArea(GroupedArea):
         if hex_val == -1 or ag.buffer is None:
             return False
 
-        at_end = ag.cursor_offset == ag.buffer.size
-        if at_end or (not overwrite and self._cursor_digit == 0):
-            orig = 0
-        else:
-            orig = ag.buffer[ag.cursor_offset]
+        buf = ag.buffer
+        off = ag.cursor_offset
+        at_end = off >= buf.size
 
-        hi = (orig >> 4) & 0xF
-        lo = orig & 0xF
-        if self._cursor_digit == 0:
-            hi = hex_val
+        if overwrite and not at_end:
+            # OVR: read current byte, replace one nibble, write back
+            orig = buf[off]
+            hi = (orig >> 4) & 0xF
+            lo = orig & 0xF
+            if self._cursor_digit == 0:
+                hi = hex_val
+            else:
+                lo = hex_val
+            buf.replace(off, off, bytes([hi * 16 + lo]))
         else:
-            lo = hex_val
-        repl = bytes([hi * 16 + lo])
-
-        if at_end:
-            ag.buffer.append(repl, 0, 1)
-        elif not overwrite and self._cursor_digit == 0:
-            ag.buffer.insert(ag.cursor_offset, repl, 0, 1)
-        else:
-            ag.buffer.replace(ag.cursor_offset, ag.cursor_offset, repl)
+            # INS: on first digit insert a new byte, on second digit modify it
+            if self._cursor_digit == 0:
+                # Insert new byte; high nibble set, low nibble = 0
+                new_byte = hex_val << 4
+                if at_end:
+                    buf.append(bytes([new_byte]), 0, 1)
+                else:
+                    buf.insert(off, bytes([new_byte]), 0, 1)
+            else:
+                # Second nibble: modify the byte we just inserted
+                if not at_end:
+                    orig = buf[off]
+                    new_byte = (orig & 0xF0) | (hex_val & 0x0F)
+                    buf.replace(off, off, bytes([new_byte]))
+                    return True  # don't advance cursor after second nibble here
+                # At end with second digit: just update
+                if buf.size > 0:
+                    orig = buf[buf.size - 1]
+                    new_byte = (orig & 0xF0) | (hex_val & 0x0F)
+                    buf.replace(buf.size - 1, buf.size - 1, bytes([new_byte]))
         return True
 
 
@@ -300,16 +314,17 @@ class AsciiArea(Area):
         ag = self.area_group
         if ag.buffer is None:
             return False
-        if 0x20 <= key <= 0x7E:
-            ba = bytes([key & 0xFF])
-            if ag.cursor_offset == ag.buffer.size:
-                ag.buffer.append(ba, 0, 1)
-            elif overwrite:
-                ag.buffer.replace(ag.cursor_offset, ag.cursor_offset, ba)
-            else:
-                ag.buffer.insert(ag.cursor_offset, ba, 0, 1)
-            return True
-        return False
+        if not (0x20 <= key <= 0x7E):
+            return False
+        ba = bytes([key & 0xFF])
+        off = ag.cursor_offset
+        if off >= ag.buffer.size:
+            ag.buffer.append(ba, 0, 1)
+        elif overwrite:
+            ag.buffer.replace(off, off, ba)
+        else:
+            ag.buffer.insert(off, ba, 0, 1)
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +352,6 @@ class OffsetArea(Area):
         nrows = self.height // self.drawer.height
 
         if buf_size == 0:
-            # Render one blank row to show the offset column even on empty files
             for i in range(nrows):
                 self._render_row_normal(i, 0, 0, True)
             return
@@ -350,11 +364,51 @@ class OffsetArea(Area):
         full_rows = visible_bytes // self.bpr
         if visible_bytes % self.bpr:
             full_rows += 1
+
         for i in range(full_rows):
             self._render_row_normal(i, 0, self.bpr, True)
-        # fill remaining rows with blank background
-        for i in range(full_rows, nrows):
-            self._render_row_normal(i, 0, 0, True)
+
+        # The row immediately after the last content row: render its offset
+        # even though it has no bytes (so the user sees where the next byte
+        # would go, matching the original Bless behaviour).
+        if full_rows < nrows:
+            self._render_offset_only(full_rows)
+
+        # Fill remaining rows with blank background only
+        for i in range(full_rows + 1, nrows):
+            self._render_blank_row(i)
+
+    def _render_offset_only(self, row: int) -> None:
+        """Render the offset number for a row that has no content bytes."""
+        if not self.drawer:
+            return
+        ag = self.area_group
+        dw = self.drawer.width
+        dh = self.drawer.height
+        ry = row * dh + self.y
+        roffset = ag.offset + row * self.bpr
+        odd = (row % 2) == 1
+        back = self.drawer.get_background_color(
+            RowType.Odd if odd else RowType.Even, HighlightType.Normal)
+        self._fill_rect(back, self.x, ry, self.width, dh)
+        row_type = RowType.Odd if odd else RowType.Even
+        rx = (self._bytes - 1) * 2 * dw + self.x
+        val = roffset
+        for _ in range(self._bytes):
+            self.drawer.draw_normal(self._cr, rx, ry, val & 0xFF,
+                                    row_type, ColumnType.Even)
+            val >>= 8
+            rx -= 2 * dw
+
+    def _render_blank_row(self, row: int) -> None:
+        if not self.drawer:
+            return
+        dh = self.drawer.height
+        ry = row * dh + self.y
+        odd = (row % 2) == 1
+        back = self.drawer.get_background_color(
+            RowType.Odd if odd else RowType.Even, HighlightType.Normal)
+        self._fill_rect(back, self.x, ry, self.width, dh)
 
     def _render_row_normal(self, row: int, start_byte: int,
                            count: int, blank: bool) -> None:

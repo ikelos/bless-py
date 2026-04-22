@@ -167,14 +167,48 @@ class Area(ABC):
 
     def _render_highlights(self) -> None:
         ag = self.area_group
-        from .area_group import AreaGroup
         overlaps = ag.get_highlights_in_view()
-        for ah in overlaps:
-            self._render_highlight(ah, HighlightType.Normal, HighlightType.Normal)
+        for h in overlaps:
+            if not h.is_empty():
+                self._render_highlight_range(h.start, h.end, h.type)
+
+    def _render_highlight_range(self, start: int, end: int,
+                                 ht: HighlightType) -> None:
+        """Render the bytes [start, end] with the given highlight type."""
+        ag = self.area_group
+        if self.drawer is None or self.bpr <= 0 or ag.buffer is None:
+            return
+        dh = self.drawer.height
+        if dh <= 0:
+            return
+        view_start = ag.offset
+        view_end   = view_start + (self.height // dh) * self.bpr - 1
+
+        # Clamp to visible range
+        hl_start = max(start, view_start)
+        hl_end   = min(end,   view_end)
+        if hl_start > hl_end:
+            return
+
+        first_row = (hl_start - view_start) // self.bpr
+        last_row  = (hl_end   - view_start) // self.bpr
+
+        for row in range(first_row, last_row + 1):
+            row_start_off = view_start + row * self.bpr
+            # byte index within this row where highlight begins/ends
+            sb = max(hl_start - row_start_off, 0)
+            eb = min(hl_end   - row_start_off, self.bpr - 1)
+            count = eb - sb + 1
+            if count > 0:
+                self._render_row_highlight(row, sb, count, False, ht)
 
     def _render_highlight(self, h, left_ht: HighlightType,
                           right_ht: HighlightType) -> None:
-        pass  # Detailed per-highlight rendering handled in subclasses
+        """Legacy single-highlight entry point — delegates to _render_highlight_range."""
+        if not h.is_empty():
+            self._render_highlight_range(h.start, h.end,
+                                         h.type if hasattr(h, 'type')
+                                         else HighlightType.Selection)
 
     def _render_cursor(self) -> None:
         if not self._cursor_focus or not self._can_focus:

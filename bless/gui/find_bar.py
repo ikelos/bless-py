@@ -52,7 +52,7 @@ class _BaseBar(Gtk.Box):
         self.pack_end(close, False, False, 0)
 
         self._status = Gtk.Label(label="", xalign=0.0)
-        self._status.set_width_chars(20)
+        self._status.set_width_chars(24)
         self.pack_end(self._status, False, False, 0)
 
     def attach_view(self, dv: "DataView") -> None:
@@ -75,28 +75,34 @@ class _BaseBar(Gtk.Box):
     def _do_find(self, text: str, fmt: str, forward: bool = True) -> None:
         dv = self._dv
         if dv is None or dv.buffer is None:
+            self._set_status("No file open.", error=True)
             return
         data = _parse(text, fmt)
         if data is None:
             self._set_status("Invalid pattern.", error=True)
             return
         if not data:
+            self._set_status("Empty pattern.", error=True)
             return
+
+        # Cancel any in-flight search
+        if self._op is not None:
+            self._op.cancel()
 
         strategy = BMFindStrategy()
         strategy.pattern  = data
         strategy.buffer   = dv.buffer
         strategy.position = dv.cursor_offset
 
-        self.set_sensitive(False)
-
         def _done(op: FindOperation) -> None:
             def _idle():
-                self.set_sensitive(True)
+                # re-check dv is still valid
+                if self._dv is None:
+                    return False
                 if op.match:
-                    dv.set_selection(op.match.start, op.match.end)
-                    dv.move_cursor(op.match.end + 1, 0)
-                    dv.display.make_offset_visible(op.match.start, "start")
+                    self._dv.set_selection(op.match.start, op.match.end)
+                    self._dv.move_cursor(op.match.end + 1, 0)
+                    self._dv.display.make_offset_visible(op.match.start, "start")
                     self._set_status(f"Found at 0x{op.match.start:X}.")
                 else:
                     self._set_status("Not found.", error=True)
@@ -114,28 +120,34 @@ class FindBar(_BaseBar):
         super().__init__()
 
         self.pack_start(Gtk.Label(label="Find:"), False, False, 0)
-        self._entry = Gtk.Entry(width_chars=30)
+        self._entry = Gtk.Entry()
+        self._entry.set_width_chars(20)
+        self._entry.set_hexpand(False)
         self._entry.connect("activate", lambda _: self._search(forward=True))
         self._entry.connect("key-press-event", self._on_entry_key)
-        self.pack_start(self._entry, True, True, 0)
+        self.pack_start(self._entry, False, False, 0)
 
         self._fmt = self._make_fmt_combo()
         self.pack_start(self._fmt, False, False, 0)
-
-        btn_next = Gtk.Button(label="Next ↓")
-        btn_next.connect("clicked", lambda _: self._search(forward=True))
-        self.pack_start(btn_next, False, False, 0)
 
         btn_prev = Gtk.Button(label="← Prev")
         btn_prev.connect("clicked", lambda _: self._search(forward=False))
         self.pack_start(btn_prev, False, False, 0)
 
-        self.show_all()
-        self.hide()
+        btn_next = Gtk.Button(label="Next →")
+        btn_next.connect("clicked", lambda _: self._search(forward=True))
+        self.pack_start(btn_next, False, False, 0)
+
+        # Hidden at startup — show via show_bar()
+        self.set_no_show_all(True)
 
     def show_bar(self) -> None:
-        self.show()
+        self.set_no_show_all(False)
+        self.show_all()
         self._entry.grab_focus()
+
+    def hide_bar(self) -> None:
+        self.hide()
 
     def _on_entry_key(self, widget, event) -> bool:
         if event.keyval == Gdk.KEY_Escape:
@@ -156,22 +168,25 @@ class FindReplaceBar(_BaseBar):
         super().__init__()
 
         inner = Gtk.Grid(column_spacing=4, row_spacing=2)
-        self.pack_start(inner, True, True, 0)
+        self.pack_start(inner, False, False, 0)
 
         inner.attach(Gtk.Label(label="Find:",    xalign=1.0), 0, 0, 1, 1)
         inner.attach(Gtk.Label(label="Replace:", xalign=1.0), 0, 1, 1, 1)
 
-        self._find_entry    = Gtk.Entry(width_chars=28)
-        self._replace_entry = Gtk.Entry(width_chars=28)
+        self._find_entry    = Gtk.Entry()
+        self._replace_entry = Gtk.Entry()
+        for e in (self._find_entry, self._replace_entry):
+            e.set_width_chars(20)
+            e.set_hexpand(False)
         inner.attach(self._find_entry,    1, 0, 1, 1)
         inner.attach(self._replace_entry, 1, 1, 1, 1)
 
         self._fmt = self._make_fmt_combo()
         inner.attach(self._fmt, 2, 0, 1, 2)
 
-        btn_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         for label, cb in (
-            ("Next ↓",      lambda _: self._do_find(
+            ("Next →",      lambda _: self._do_find(
                 self._find_entry.get_text(),
                 self._fmt.get_active_text() or "Hex", forward=True)),
             ("Replace",     lambda _: self._replace_one()),
@@ -186,15 +201,18 @@ class FindReplaceBar(_BaseBar):
         self._find_entry.connect("activate", lambda _: self._do_find(
             self._find_entry.get_text(),
             self._fmt.get_active_text() or "Hex", True))
-        self._find_entry.connect("key-press-event", self._on_key)
+        self._find_entry.connect("key-press-event",    self._on_key)
         self._replace_entry.connect("key-press-event", self._on_key)
 
-        self.show_all()
-        self.hide()
+        self.set_no_show_all(True)
 
     def show_bar(self) -> None:
-        self.show()
+        self.set_no_show_all(False)
+        self.show_all()
         self._find_entry.grab_focus()
+
+    def hide_bar(self) -> None:
+        self.hide()
 
     def _on_key(self, widget, event) -> bool:
         if event.keyval == Gdk.KEY_Escape:
