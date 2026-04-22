@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bless-hex-editor"
+version = "0.6.0"
+description = "Python/GObject-Introspection port of Bless — a GTK hex editor"
+readme = "README.md"
+license = {text = "GPL-2.0-or-later"}
+requires-python = ">=3.10"
+dependencies = [
+    "PyGObject>=3.44",
+    "watchdog>=3.0; sys_platform != 'win32'",
+]
+
+[project.scripts]
+bless = "bless.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bless*"]
