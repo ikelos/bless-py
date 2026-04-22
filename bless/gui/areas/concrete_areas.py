@@ -96,6 +96,7 @@ class GroupedArea(Area):
 
         dw = self.drawer.width
         dh = self.drawer.height
+        last = start_byte + count - 1   # index of the last highlighted byte
 
         # Advance rx to start_byte column position
         for skip in range(start_byte):
@@ -104,30 +105,40 @@ class GroupedArea(Area):
                       else self.dpb * dw)
             rx += w_step
 
-        # Compute total pixel span of the highlighted bytes (including gaps)
+        # Compute the span of highlighted pixels.
+        # For every byte EXCEPT the last: include the inter-glyph gap.
+        # For the last byte: only include the glyph itself (no trailing gap).
         span_rx = rx
         for pos in range(start_byte, start_byte + count):
-            w_step = ((self.dpb + 1) * dw
-                      if pos % self._grouping == self._grouping - 1
-                      else self.dpb * dw)
-            span_rx += w_step
+            is_group_end = (pos % self._grouping == self._grouping - 1)
+            if pos == last:
+                # Last selected byte — only the glyph, no trailing gap
+                span_rx += self.dpb * dw
+            elif is_group_end:
+                # End of a group — include inter-group gap
+                span_rx += (self.dpb + 1) * dw
+            else:
+                span_rx += self.dpb * dw
 
-        # Fill the whole span with highlight background first
+        # Fill exactly the glyph span (no overhang) with highlight background
         back = self.drawer.get_background_color(
             RowType.Odd if odd else RowType.Even, ht)
         self._fill_rect(back, rx, ry, span_rx - rx, dh)
 
-        # Now redraw each glyph with the highlight surface
+        # Redraw each glyph with the highlight surface
         row_type = RowType.Odd if odd else RowType.Even
         cur_rx = rx
         for pos in range(start_byte, start_byte + count):
             self.drawer.draw_highlight(self._cr, cur_rx, ry,
                                        ag.get_cached_byte(roffset), row_type, ht)
             roffset += 1
-            w_step = ((self.dpb + 1) * dw
-                      if pos % self._grouping == self._grouping - 1
-                      else self.dpb * dw)
-            cur_rx += w_step
+            is_group_end = (pos % self._grouping == self._grouping - 1)
+            if pos == last:
+                cur_rx += self.dpb * dw
+            elif is_group_end:
+                cur_rx += (self.dpb + 1) * dw
+            else:
+                cur_rx += self.dpb * dw
 
     def calc_width(self, n: int, force: bool = False) -> int:
         if n == 0:
@@ -500,12 +511,27 @@ class BinaryArea(GroupedArea):
 
 
 class SeparatorArea(Area):
-    """A fixed-width blank spacer between other areas."""
+    """A fixed-width spacer that draws a thin centred vertical line."""
 
     def __init__(self, ag: AreaGroup) -> None:
         super().__init__(ag)
         self.area_type = "separator"
-        self._sep_width = 8
+        self._sep_width = 8   # total pixel width — one full character
+
+    def render(self) -> None:
+        """Draw the vertical separator line for the entire visible height."""
+        if self._cr is None or self.width <= 0:
+            return
+        cr = self._cr
+        # Background
+        cr.save()
+        cr.set_source_rgb(0, 0, 0)   # black line
+        mid = self.x + self.width // 2
+        cr.set_line_width(1.0)
+        cr.move_to(mid + 0.5, self.y)
+        cr.line_to(mid + 0.5, self.y + self.height)
+        cr.stroke()
+        cr.restore()
 
     def _render_row_normal(self, *_): pass
     def _render_row_highlight(self, *_): pass

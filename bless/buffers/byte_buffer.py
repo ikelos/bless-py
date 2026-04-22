@@ -80,6 +80,7 @@ class ByteBuffer:
 
         # file-watcher (inotify via watchdog if available, else poll)
         self._watcher = None
+        self._watch_mtime: float = 0.0
 
         # RLock so that public methods can safely call each other
         self.lock = threading.RLock()
@@ -160,16 +161,33 @@ class ByteBuffer:
         try:
             from watchdog.observers import Observer
             from watchdog.events import FileSystemEventHandler
+            import time
 
-            directory = os.path.dirname(self._file_buf.filename)
+            directory = os.path.dirname(self._file_buf.filename) or "."
             fname = os.path.basename(self._file_buf.filename)
 
+            # Record mtime at open time; only fire if mtime actually changes
+            try:
+                self._watch_mtime = os.path.getmtime(self._file_buf.filename)
+            except OSError:
+                self._watch_mtime = 0.0
+
             class _Handler(FileSystemEventHandler):
-                def __init__(self, bb: ByteBuffer) -> None:
+                def __init__(self, bb: "ByteBuffer") -> None:
                     self._bb = bb
 
                 def on_modified(self, event) -> None:
-                    if not event.is_directory and os.path.basename(event.src_path) == fname:
+                    if event.is_directory:
+                        return
+                    if os.path.basename(event.src_path) != fname:
+                        return
+                    # Only emit if mtime has actually advanced since open
+                    try:
+                        new_mtime = os.path.getmtime(event.src_path)
+                    except OSError:
+                        return
+                    if new_mtime > self._bb._watch_mtime:
+                        self._bb._watch_mtime = new_mtime
                         self._bb._emit_file_changed()
 
             observer = Observer()

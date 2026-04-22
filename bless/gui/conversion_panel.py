@@ -14,25 +14,29 @@ if TYPE_CHECKING:
     from .data_view import DataView
 
 
-class ConversionPanel(Gtk.ScrolledWindow):
+class ConversionPanel(Gtk.Frame):
     """
     Bottom panel showing multi-format byte interpretations.
-    Lives inside a ScrolledWindow so the whole editor is resizable but the
-    panel contents never shrink below their natural size.
+    Uses a plain Frame (no scrolling) so all rows are always fully visible.
     """
 
     def __init__(self) -> None:
-        super().__init__()
-        self.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        self.set_min_content_height(-1)   # let GTK choose the minimum
+        super().__init__(label=None)
+        self.set_shadow_type(Gtk.ShadowType.NONE)
 
         self._dv: Optional["DataView"] = None
+
+        # Outer vbox so we can add a separator at top
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.add(vbox)
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        vbox.pack_start(sep, False, False, 0)
 
         grid = Gtk.Grid(column_spacing=12, row_spacing=4,
                         margin_top=4, margin_bottom=4,
                         margin_start=8, margin_end=8)
-        # Use a viewport so the grid is scrollable
-        self.add(grid)
+        vbox.pack_start(grid, False, False, 0)
 
         col0_labels = [
             "Signed 8 bit:",
