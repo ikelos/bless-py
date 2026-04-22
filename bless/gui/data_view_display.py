@@ -11,9 +11,9 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk
 
 from .areas.area_group import AreaGroup
-from .areas.concrete_areas import (
-    HexArea, AsciiArea, OffsetArea, SeparatorArea,
-)
+from .areas.concrete_areas import HexArea, AsciiArea, OffsetArea, SeparatorArea
+from .conversion_panel import ConversionPanel
+from .find_bar import FindBar, FindReplaceBar
 
 if TYPE_CHECKING:
     from .data_view import DataView
@@ -23,8 +23,11 @@ if TYPE_CHECKING:
 
 class DataViewDisplay(Gtk.Box):
     """
-    GTK widget that wraps a DrawingArea + VScrollbar.
-    Translates GTK events into AreaGroup operations.
+    GTK widget that wraps:
+      DrawingArea + VScrollbar
+      ├── FindBar         (Ctrl+F, hidden by default)
+      ├── FindReplaceBar  (Ctrl+H, hidden by default)
+      └── ConversionPanel (always shown)
     """
 
     def __init__(self, dv: "DataView") -> None:
@@ -33,19 +36,21 @@ class DataViewDisplay(Gtk.Box):
         self._control: Optional["DataViewControl"] = None
         self._realized = False
 
-        # Build the default layout (offset | hex | ascii)
+        # ── Area group ────────────────────────────────────────────────
         self._area_group = AreaGroup()
         ag = self._area_group
 
         self._drawing_area = Gtk.DrawingArea()
         ag.drawing_area = self._drawing_area
         ag.areas.clear()
-        for factory in (OffsetArea, lambda g: SeparatorArea(g),
-                        HexArea,   lambda g: SeparatorArea(g),
+        for factory in (OffsetArea,
+                        lambda g: SeparatorArea(g),
+                        HexArea,
+                        lambda g: SeparatorArea(g),
                         AsciiArea):
             ag.areas.append(factory(ag))
 
-        # Scrollbar
+        # ── Scrollbar ─────────────────────────────────────────────────
         adj = Gtk.Adjustment(value=0, lower=0, upper=1,
                              step_increment=1, page_increment=10,
                              page_size=10)
@@ -53,49 +58,57 @@ class DataViewDisplay(Gtk.Box):
                                       adjustment=adj)
         adj.connect("value-changed", self._on_scrolled)
 
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        hbox.pack_start(self._drawing_area, True, True, 0)
-        hbox.pack_start(self._vscroll, False, False, 0)
-        self.pack_start(hbox, True, True, 0)
+        hex_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        hex_row.pack_start(self._drawing_area, True, True, 0)
+        hex_row.pack_start(self._vscroll, False, False, 0)
 
-        # Wire drawing area events
+        # ── File-changed bar ──────────────────────────────────────────
+        self._file_changed_bar = Gtk.InfoBar()
+        self._file_changed_bar.set_message_type(Gtk.MessageType.WARNING)
+        lbl = Gtk.Label(label="File has changed on disk.")
+        self._file_changed_bar.get_content_area().pack_start(lbl, False, False, 0)
+        self._file_changed_bar.add_button("Reload", Gtk.ResponseType.YES)
+        self._file_changed_bar.connect("response", self._on_file_changed_response)
+
+        # ── Find / replace bars ───────────────────────────────────────
+        self._find_bar     = FindBar()
+        self._find_replace_bar = FindReplaceBar()
+
+        # ── Conversion panel ──────────────────────────────────────────
+        self._conv_panel = ConversionPanel()
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+
+        # ── Pack everything ───────────────────────────────────────────
+        self.pack_start(self._file_changed_bar, False, False, 0)
+        self.pack_start(hex_row,               True,  True,  0)
+        self.pack_start(self._find_bar,         False, False, 0)
+        self.pack_start(self._find_replace_bar, False, False, 0)
+        self.pack_start(sep,                    False, False, 0)
+        self.pack_start(self._conv_panel,       False, False, 0)
+
+        # ── Wire drawing area events ──────────────────────────────────
         da = self._drawing_area
-        da.connect("realize",        self._on_realized)
-        da.connect("draw",           self._on_drawn)
-        da.connect("configure-event",self._on_configured)
+        da.connect("realize",              self._on_realized)
+        da.connect("draw",                 self._on_drawn)
+        da.connect("configure-event",      self._on_configured)
         da.connect("button-press-event",   self._on_button_press)
         da.connect("button-release-event", self._on_button_release)
         da.connect("motion-notify-event",  self._on_motion_notify)
         da.connect("key-press-event",      self._on_key_press)
-        da.connect("key-release-event",    self._on_key_release)
         da.connect("scroll-event",         self._on_scroll)
         da.add_events(
             Gdk.EventMask.BUTTON_PRESS_MASK   |
             Gdk.EventMask.BUTTON_RELEASE_MASK |
             Gdk.EventMask.POINTER_MOTION_MASK |
             Gdk.EventMask.KEY_PRESS_MASK      |
-            Gdk.EventMask.KEY_RELEASE_MASK    |
             Gdk.EventMask.SCROLL_MASK         |
             Gdk.EventMask.SMOOTH_SCROLL_MASK
         )
         da.set_can_focus(True)
 
-        # File-changed info bar (hidden by default)
-        self._file_changed_bar: Optional[Gtk.InfoBar] = None
-        self._build_file_changed_bar()
-
         self.show_all()
-
-    def _build_file_changed_bar(self) -> None:
-        bar = Gtk.InfoBar()
-        bar.set_message_type(Gtk.MessageType.WARNING)
-        label = Gtk.Label(label="File has changed on disk.")
-        bar.get_content_area().pack_start(label, False, False, 0)
-        btn = bar.add_button("Reload", Gtk.ResponseType.YES)
-        bar.connect("response", self._on_file_changed_bar_response)
-        self.pack_start(bar, False, False, 0)
-        self.reorder_child(bar, 0)
-        self._file_changed_bar = bar
+        self._file_changed_bar.hide()
 
     # ------------------------------------------------------------------
     # Properties
@@ -117,15 +130,25 @@ class DataViewDisplay(Gtk.Box):
     def control(self, c: "DataViewControl") -> None:
         self._control = c
 
+    @property
+    def conversion_panel(self) -> ConversionPanel:
+        return self._conv_panel
+
+    @property
+    def find_bar(self) -> FindBar:
+        return self._find_bar
+
+    @property
+    def find_replace_bar(self) -> FindReplaceBar:
+        return self._find_replace_bar
+
     # ------------------------------------------------------------------
     # Layout / resize
     # ------------------------------------------------------------------
 
     def _find_best_bpr(self, width: int) -> int:
-        # Bail early if areas haven't been realized yet (no drawers)
         if not self._area_group.areas or not self._area_group.areas[0].drawer:
-            return 16  # sensible default
-
+            return 16
         n = 1
         best = 1
         while True:
@@ -150,7 +173,6 @@ class DataViewDisplay(Gtk.Box):
         if bpr <= 0:
             bpr = 1
 
-        # Snap offset to row boundary
         ag = self._area_group
         if bpr > 0 and ag.offset % bpr != 0:
             ag.offset = (ag.offset // bpr) * bpr
@@ -159,11 +181,11 @@ class DataViewDisplay(Gtk.Box):
         font_h = win_h
         for a in ag.areas:
             a.bpr    = bpr
-            a.width  = a.calc_width(bpr, force=True)
+            a.width  = max(0, a.calc_width(bpr, force=True))
             a.x      = x
             a.height = win_h
-            x += max(a.width, 0)
-            if a.drawer and a.drawer.height < font_h and a.drawer.height > 0:
+            x += a.width
+            if a.drawer and 0 < a.drawer.height < font_h:
                 font_h = a.drawer.height
 
         if font_h <= 0:
@@ -172,7 +194,6 @@ class DataViewDisplay(Gtk.Box):
         adj = self._vscroll.get_adjustment()
         adj.set_page_size(win_h // font_h)
         self._vscroll.set_increments(3, max(1, adj.get_page_size() - 1))
-
         self._setup_scrollbar_range(bpr)
 
     def _setup_scrollbar_range(self, bpr: int) -> None:
@@ -180,22 +201,21 @@ class DataViewDisplay(Gtk.Box):
         if not dv.buffer or bpr <= 0:
             return
         buf_size = dv.buffer.size
-        nrows = (buf_size + 1) // bpr
-        adj = self._vscroll.get_adjustment()
-        page = adj.get_page_size()
-        if nrows < page:
+        nrows = (buf_size + bpr - 1) // bpr
+        adj   = self._vscroll.get_adjustment()
+        page  = adj.get_page_size()
+        if nrows <= page:
             self._vscroll.set_value(0)
             adj.set_lower(0)
-            adj.set_upper(nrows)
+            adj.set_upper(max(nrows, page))
             self._vscroll.hide()
         else:
-            extra = 1 if (buf_size + 1) % bpr != 0 else 0
             adj.set_lower(0)
-            adj.set_upper(nrows + extra)
+            adj.set_upper(nrows + 1)
             self._vscroll.show()
 
     # ------------------------------------------------------------------
-    # Scrolling helpers
+    # Scrolling
     # ------------------------------------------------------------------
 
     def make_offset_visible(self, offset: int, show_type: str) -> None:
@@ -203,42 +223,33 @@ class DataViewDisplay(Gtk.Box):
         if not ag.areas:
             return
         first = ag.areas[0]
-        bpr = first.bpr
+        bpr   = first.bpr
         if bpr <= 0:
             return
         font_h = first.drawer.height if first.drawer else 16
-        nrows = first.height // font_h if font_h else 1
+        nrows  = first.height // font_h if font_h else 1
         cur_row = ag.offset // bpr
         end_row = cur_row + nrows - 1
-        tgt_row = offset // bpr
+        tgt_row = offset  // bpr
+        adj     = self._vscroll.get_adjustment()
 
-        adj = self._vscroll.get_adjustment()
-
-        def _set_scroll(row: int) -> None:
-            adj.set_value(max(0, float(row)))
+        def _set(row: int) -> None:
+            adj.set_value(max(0.0, float(row)))
             self._on_scrolled(adj)
 
         if show_type == "closest":
-            if cur_row > tgt_row:
-                show_type = "start"
-            elif end_row < tgt_row:
-                show_type = "end"
-            else:
-                return
+            if   cur_row > tgt_row:  show_type = "start"
+            elif end_row < tgt_row:  show_type = "end"
+            else: return
 
-        if show_type == "start":
-            _set_scroll(tgt_row)
-        elif show_type == "end":
-            _set_scroll(max(0, tgt_row - nrows + 1))
+        if   show_type == "start":  _set(tgt_row)
+        elif show_type == "end":    _set(max(0, tgt_row - nrows + 1))
         elif show_type == "cursor":
             cur_row2 = ag.cursor_offset // bpr
             diff = cur_row2 - cur_row
-            if 0 <= diff <= nrows:
-                _set_scroll(tgt_row - diff)
-            elif diff > nrows:
-                _set_scroll(max(0, tgt_row - nrows + 1))
-            else:
-                _set_scroll(tgt_row)
+            if   0 <= diff <= nrows:  _set(tgt_row - diff)
+            elif diff > nrows:        _set(max(0, tgt_row - nrows + 1))
+            else:                     _set(tgt_row)
 
     def grab_keyboard_focus(self) -> None:
         self._drawing_area.grab_focus()
@@ -255,8 +266,15 @@ class DataViewDisplay(Gtk.Box):
         self._drawing_area.queue_draw()
 
     def show_file_changed_bar(self) -> None:
-        if self._file_changed_bar:
-            self._file_changed_bar.show_all()
+        self._file_changed_bar.show_all()
+
+    def show_find(self) -> None:
+        self._find_replace_bar.hide()
+        self._find_bar.show_bar()
+
+    def show_find_replace(self) -> None:
+        self._find_bar.hide()
+        self._find_replace_bar.show_bar()
 
     def cleanup(self) -> None:
         self._control = None
@@ -270,7 +288,6 @@ class DataViewDisplay(Gtk.Box):
         self._realized = True
         alloc = widget.get_allocation()
         self._resize(alloc.width, alloc.height)
-        # Give focus to first focusable area (hex column by default)
         self._area_group.set_initial_focus()
         widget.queue_draw()
 
@@ -288,8 +305,8 @@ class DataViewDisplay(Gtk.Box):
         bpr = 0
         if self._area_group.areas:
             bpr = self._area_group.areas[0].bpr
-        offset = int(adj.get_value()) * bpr
-        self._area_group.offset = offset
+        if bpr > 0:
+            self._area_group.offset = int(adj.get_value()) * bpr
 
     def _on_button_press(self, widget, event) -> bool:
         if self._control:
@@ -307,11 +324,16 @@ class DataViewDisplay(Gtk.Box):
         return True
 
     def _on_key_press(self, widget, event) -> bool:
+        # Ctrl+F → find bar; Ctrl+H → find+replace bar
+        ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
+        if ctrl and event.keyval in (Gdk.KEY_f, Gdk.KEY_F):
+            self.show_find()
+            return True
+        if ctrl and event.keyval in (Gdk.KEY_h, Gdk.KEY_H):
+            self.show_find_replace()
+            return True
         if self._control:
             return self._control.on_key_press(widget, event)
-        return False
-
-    def _on_key_release(self, widget, event) -> bool:
         return False
 
     def _on_scroll(self, widget, event) -> bool:
@@ -320,7 +342,7 @@ class DataViewDisplay(Gtk.Box):
         adj.set_value(adj.get_value() + dy * 3)
         return True
 
-    def _on_file_changed_bar_response(self, bar, response) -> None:
+    def _on_file_changed_response(self, bar, response) -> None:
         if response == Gtk.ResponseType.YES:
             self._dv.revert()
         bar.hide()

@@ -149,7 +149,7 @@ class Area(ABC):
         buf_size = ag.buffer.size if ag.buffer else 0
         nrows = self.height // self.drawer.height
         visible = nrows * self.bpr
-        visible = max(0, min(visible, buf_size - ag.offset + 1))
+        visible = max(0, min(visible, buf_size - ag.offset))
 
         full_rows = visible // self.bpr
         last_row_bytes = visible % self.bpr
@@ -180,17 +180,29 @@ class Area(ABC):
         if not self._cursor_focus or not self._can_focus:
             return
         ag = self.area_group
-        if ag.buffer is None or ag.cursor_offset > ag.buffer.size:
+        if ag.buffer is None:
             return
         row, _, cx, cy = self.get_display_info_by_offset(ag.cursor_offset)
+        if self.drawer is None:
+            return
         # Shift right by cursor_digit so hex shows cursor on the active nibble
-        if self.drawer:
-            cx += self._cursor_digit * self.drawer.width
+        cx += self._cursor_digit * self.drawer.width
+        # Translate to screen coordinates
+        sx = cx + self.x
+        sy = cy + self.y
+        w  = self.drawer.width
+        h  = self.drawer.height
         color = (self._active_cursor_color if self._is_active
                  else self._inactive_cursor_color)
-        if self.drawer:
-            self._fill_rect(color, cx + self.x, cy + self.y,
-                            self.drawer.width, self.drawer.height)
+        if self._cr is None:
+            return
+        # Draw as a 2-pixel outline so the character underneath stays visible
+        self._cr.save()
+        self._cr.set_source_rgba(color.red, color.green, color.blue, color.alpha)
+        self._cr.set_line_width(2.0)
+        self._cr.rectangle(sx + 1, sy + 1, w - 2, h - 2)
+        self._cr.stroke()
+        self._cr.restore()
 
     # ------------------------------------------------------------------
     # Properties

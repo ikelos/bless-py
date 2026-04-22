@@ -61,17 +61,43 @@ class DataViewControl:
     def display(self, d: "DataViewDisplay") -> None:
         self._display = d
 
+    def reset_selection(self) -> None:
+        """Called when a new buffer is loaded — reset stale cursor state."""
+        self._sel_start = _Pos(0, 0, 0)
+        self._sel_end   = _Pos(0, 0, 0)
+
     # ------------------------------------------------------------------
     # Helper: area at (x, y)
     # ------------------------------------------------------------------
 
     def _area_at(self, x: int, y: int) -> Optional["Area"]:
+        """Return the best Area for a screen (x, y) hit.
+        Separator and offset areas are non-interactive; we fall back to the
+        nearest focusable area to avoid mapping clicks to wrong offsets."""
         if self._display is None:
             return None
-        for a in self._display.area_group.areas:
-            if a.x <= x <= a.x + a.width:
-                return a
-        return None
+        areas = self._display.area_group.areas
+        hit = None
+        for a in areas:
+            if a.x <= x < a.x + max(a.width, 1):
+                hit = a
+                break
+        if hit is None:
+            return None
+        # If we landed on a non-focusable area, find the nearest focusable one
+        if not hit.can_focus:
+            best = None
+            best_dist = float("inf")
+            cx = x
+            for a in areas:
+                if a.can_focus:
+                    mid = a.x + a.width / 2
+                    d = abs(mid - cx)
+                    if d < best_dist:
+                        best_dist = d
+                        best = a
+            return best
+        return hit
 
     # ------------------------------------------------------------------
     # Offset / position calculation
@@ -255,42 +281,45 @@ class DataViewControl:
         cur = _Pos(dv.cursor_offset - 1, dv.cursor_offset, dv.cursor_digit)
         nxt = cur.copy()
 
-        key = event.keyval
+        key   = event.keyval
         shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
 
-        special = True
+        # handled = True  →  update cursor/selection then return True
+        # handled = False →  key not consumed, propagate
+        handled = False
+
         if key == Gdk.KEY_Left:
-            self._key_left(cur, nxt)
+            self._key_left(cur, nxt);   handled = True
         elif key == Gdk.KEY_Right:
-            self._key_right(cur, nxt)
+            self._key_right(cur, nxt);  handled = True
         elif key == Gdk.KEY_Up:
-            self._key_up(cur, nxt)
+            self._key_up(cur, nxt);     handled = True
         elif key == Gdk.KEY_Down:
-            self._key_down(cur, nxt)
+            self._key_down(cur, nxt);   handled = True
         elif key == Gdk.KEY_Page_Up:
-            self._key_page_up(cur, nxt)
+            self._key_page_up(cur, nxt);   handled = True
         elif key == Gdk.KEY_Page_Down:
-            self._key_page_down(cur, nxt)
+            self._key_page_down(cur, nxt); handled = True
         elif key == Gdk.KEY_Home:
-            self._key_home(cur, nxt)
+            self._key_home(cur, nxt);  handled = True
         elif key == Gdk.KEY_End:
-            self._key_end(cur, nxt)
+            self._key_end(cur, nxt);   handled = True
         elif key == Gdk.KEY_Insert:
             dv.overwrite = not dv.overwrite
             return True
         elif key == Gdk.KEY_Tab:
             ag.cycle_focus()
             return True
-        elif key in (Gdk.KEY_BackSpace,):
+        elif key == Gdk.KEY_BackSpace:
             dv.delete_backspace()
             return True
         elif key == Gdk.KEY_Delete:
             dv.delete()
             return True
         else:
-            special = not self._key_default(event, cur, nxt)
+            handled = self._key_default(event, cur, nxt)
 
-        if not special:
+        if handled:
             if shift:
                 self._sel_end = nxt.copy()
             else:

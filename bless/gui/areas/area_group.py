@@ -161,26 +161,40 @@ class AreaGroup:
         if self._buffer is None or self._drawing_area is None:
             self._buffer_cache = None
             return
-        # Determine visible rows
         first_area = self._areas[0] if self._areas else None
-        if first_area is None or first_area.drawer is None:
+        if first_area is None or first_area.drawer is None or first_area.bpr <= 0:
             return
-        bpr = first_area.bpr
-        if bpr <= 0:
-            return
-        da_height = self._drawing_area.get_allocated_height()
-        row_h = first_area.drawer.height
-        nrows = (da_height + row_h - 1) // row_h if row_h else 1
-        n_bytes = nrows * bpr
-        n_bytes = min(n_bytes, self._buffer.size - self._offset)
+        bpr    = first_area.bpr
+        da_h   = self._drawing_area.get_allocated_height()
+        row_h  = first_area.drawer.height
+        nrows  = (da_h + row_h - 1) // row_h if row_h else 1
+        n_bytes = min(nrows * bpr, max(0, self._buffer.size - self._offset))
         if n_bytes <= 0:
             self._buffer_cache = bytearray()
             return
         self._buffer_cache = bytearray(n_bytes)
-        for i in range(n_bytes):
-            idx = self._offset + i
-            if idx < self._buffer.size:
-                self._buffer_cache[i] = self._buffer[idx]
+        # Single bulk read — vastly faster than per-byte for large files
+        with self._buffer.lock:
+            seg, mapping, _ = self._buffer._seg_col.find_segment(self._offset)
+            if seg is None:
+                return
+            # Walk segments, filling cache
+            pos = 0
+            cur_off = self._offset
+            seg2, mapping2, node2 = self._buffer._seg_col.find_segment(cur_off)
+            while pos < n_bytes and seg2 is not None:
+                seg_start = seg2.start + (cur_off - mapping2)
+                seg_avail = seg2.end - seg_start + 1
+                to_read   = min(seg_avail, n_bytes - pos)
+                seg2.buffer.read(self._buffer_cache, pos, seg_start, to_read)
+                pos     += to_read
+                cur_off += to_read
+                if node2 and node2.next:
+                    node2    = node2.next
+                    seg2     = node2.data
+                    mapping2 = cur_off  # mapping of next segment
+                else:
+                    break
 
     def get_cached_byte(self, pos: int) -> int:
         idx = pos - self._offset

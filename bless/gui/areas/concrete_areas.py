@@ -142,9 +142,9 @@ class GroupedArea(Area):
 
     def get_offset_by_display_info(self, x: int, y: int) -> tuple[int, int, GetOffsetFlags]:
         flags = GetOffsetFlags(0)
+        ag = self.area_group
         if not self.drawer:
             return ag.offset, 0, flags
-        ag = self.area_group
         dw = self.drawer.width
         dh = self.drawer.height
         group_w = self._grouping * self.dpb * dw + dw
@@ -344,7 +344,7 @@ class OffsetArea(Area):
 
         visible_bytes = nrows * self.bpr
         if ag.offset + visible_bytes > buf_size:
-            visible_bytes = buf_size - ag.offset + 1
+            visible_bytes = buf_size - ag.offset
         visible_bytes = max(visible_bytes, 0)
 
         full_rows = visible_bytes // self.bpr

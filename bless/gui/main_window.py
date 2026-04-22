@@ -3,21 +3,19 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-
 import os
 import sys
 
 import gi
-
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk, Gio, GLib, Gtk
+from gi.repository import Gtk, Gdk, GLib, Gio
 
-from ..tools.preferences import Preferences
+from ..buffers.byte_buffer import ByteBuffer
 from .data_book import DataBook
 from .data_view import DataView
 from .plugins.file_operations import FileOperations
-from .plugins.find_replace import FindReplaceDialog
+from ..tools.preferences import Preferences
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -34,8 +32,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_icon_name("accessories-text-editor")
 
         self._data_book = DataBook()
-        self._file_ops = FileOperations(self._data_book, self)
-        self._find_dlg: FindReplaceDialog | None = None
+        self._file_ops  = FileOperations(self._data_book, self)
         self._initial_files = list(files) if files else []
 
         self._build_ui()
@@ -86,14 +83,14 @@ class MainWindow(Gtk.ApplicationWindow):
         # File menu
         file_menu = Gtk.Menu()
         for label, cb in (
-            ("_New", lambda *_: self._file_ops.new_file()),
-            ("_Open…", lambda *_: self._file_ops.open_file()),
-            ("_Save", lambda *_: self._file_ops.save_file()),
-            ("Save _As…", lambda *_: self._file_ops.save_file_as()),
-            ("_Revert", lambda *_: self._file_ops.revert_file()),
+            ("_New",          lambda *_: self._file_ops.new_file()),
+            ("_Open…",        lambda *_: self._file_ops.open_file()),
+            ("_Save",         lambda *_: self._file_ops.save_file()),
+            ("Save _As…",     lambda *_: self._file_ops.save_file_as()),
+            ("_Revert",       lambda *_: self._file_ops.revert_file()),
             (None, None),
-            ("_Close", lambda *_: self._file_ops.close_file()),
-            ("_Quit", lambda *_: self.get_application().quit()),
+            ("_Close",        lambda *_: self._file_ops.close_file()),
+            ("_Quit",         lambda *_: self.get_application().quit()),
         ):
             if label is None:
                 file_menu.append(Gtk.SeparatorMenuItem())
@@ -108,15 +105,15 @@ class MainWindow(Gtk.ApplicationWindow):
         # Edit menu
         edit_menu = Gtk.Menu()
         for label, cb in (
-            ("_Undo", lambda *_: self._current_dv_call("undo")),
-            ("_Redo", lambda *_: self._current_dv_call("redo")),
+            ("_Undo",         lambda *_: self._current_dv_call("undo")),
+            ("_Redo",         lambda *_: self._current_dv_call("redo")),
             (None, None),
-            ("Cu_t", lambda *_: self._current_dv_call("cut")),
-            ("_Copy", lambda *_: self._current_dv_call("copy")),
-            ("_Paste", lambda *_: self._current_dv_call("paste")),
-            ("_Delete", lambda *_: self._current_dv_call("delete")),
+            ("Cu_t",          lambda *_: self._current_dv_call("cut")),
+            ("_Copy",         lambda *_: self._current_dv_call("copy")),
+            ("_Paste",        lambda *_: self._current_dv_call("paste")),
+            ("_Delete",       lambda *_: self._current_dv_call("delete")),
             (None, None),
-            ("Select _All", lambda *_: self._select_all()),
+            ("Select _All",   lambda *_: self._select_all()),
         ):
             if label is None:
                 edit_menu.append(Gtk.SeparatorMenuItem())
@@ -130,9 +127,12 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # Search menu
         search_menu = Gtk.Menu()
-        find_item = Gtk.MenuItem.new_with_mnemonic("_Find & Replace…")
-        find_item.connect("activate", lambda *_: self._show_find_dialog())
+        find_item = Gtk.MenuItem.new_with_mnemonic("_Find…       Ctrl+F")
+        find_item.connect("activate", lambda *_: self._show_find())
         search_menu.append(find_item)
+        fr_item = Gtk.MenuItem.new_with_mnemonic("Find & _Replace…  Ctrl+H")
+        fr_item.connect("activate", lambda *_: self._show_find_replace())
+        search_menu.append(fr_item)
         search_item = Gtk.MenuItem.new_with_mnemonic("_Search")
         search_item.set_submenu(search_menu)
         mb.append(search_item)
@@ -152,26 +152,25 @@ class MainWindow(Gtk.ApplicationWindow):
         tb = Gtk.Toolbar()
         tb.set_style(Gtk.ToolbarStyle.ICONS)
         for icon, tooltip, cb in (
-            ("document-new", "New", lambda *_: self._file_ops.new_file()),
-            ("document-open", "Open", lambda *_: self._file_ops.open_file()),
-            ("document-save", "Save", lambda *_: self._file_ops.save_file()),
+            ("document-new",  "New",     lambda *_: self._file_ops.new_file()),
+            ("document-open", "Open",    lambda *_: self._file_ops.open_file()),
+            ("document-save", "Save",    lambda *_: self._file_ops.save_file()),
             (None, None, None),
-            ("edit-cut", "Cut", lambda *_: self._current_dv_call("cut")),
-            ("edit-copy", "Copy", lambda *_: self._current_dv_call("copy")),
-            ("edit-paste", "Paste", lambda *_: self._current_dv_call("paste")),
+            ("edit-cut",      "Cut",     lambda *_: self._current_dv_call("cut")),
+            ("edit-copy",     "Copy",    lambda *_: self._current_dv_call("copy")),
+            ("edit-paste",    "Paste",   lambda *_: self._current_dv_call("paste")),
             (None, None, None),
-            ("edit-undo", "Undo", lambda *_: self._current_dv_call("undo")),
-            ("edit-redo", "Redo", lambda *_: self._current_dv_call("redo")),
+            ("edit-undo",     "Undo",    lambda *_: self._current_dv_call("undo")),
+            ("edit-redo",     "Redo",    lambda *_: self._current_dv_call("redo")),
             (None, None, None),
-            ("edit-find", "Find", lambda *_: self._show_find_dialog()),
+            ("edit-find",     "Find",    lambda *_: self._show_find()),
         ):
             if icon is None:
                 tb.insert(Gtk.SeparatorToolItem(), -1)
             else:
                 btn = Gtk.ToolButton.new(
                     Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.SMALL_TOOLBAR),
-                    tooltip,
-                )
+                    tooltip)
                 btn.set_tooltip_text(tooltip)
                 btn.connect("clicked", cb)
                 tb.insert(btn, -1)
@@ -191,10 +190,15 @@ class MainWindow(Gtk.ApplicationWindow):
         if dv and dv.buffer:
             dv.set_selection(0, dv.buffer.size - 1)
 
-    def _show_find_dialog(self) -> None:
-        if self._find_dlg is None:
-            self._find_dlg = FindReplaceDialog(self._data_book, self)
-        self._find_dlg.present()
+    def _show_find(self) -> None:
+        dv = self._data_book.current_view
+        if dv:
+            dv.display.show_find()
+
+    def _show_find_replace(self) -> None:
+        dv = self._data_book.current_view
+        if dv:
+            dv.display.show_find_replace()
 
     def _show_about(self) -> None:
         dlg = Gtk.AboutDialog(transient_for=self, modal=True)
@@ -263,7 +267,10 @@ class MainWindow(Gtk.ApplicationWindow):
         if dv.buffer and off < dv.buffer.size:
             b = dv.buffer[off]
             val = f"  |  Value: 0x{b:02X} ({b})"
-        self._statusbar.push(self._ctx, f"Offset: 0x{off:08X} ({off}){val}")
+        self._statusbar.push(
+            self._ctx,
+            f"Offset: 0x{off:08X} ({off}){val}"
+        )
 
     def _update_title(self, dv: DataView) -> None:
         if dv is not self._data_book.current_view:
@@ -288,13 +295,11 @@ class MainWindow(Gtk.ApplicationWindow):
 # Application entry-point
 # ---------------------------------------------------------------------------
 
-
 class BlessApplication(Gtk.Application):
+
     def __init__(self) -> None:
-        super().__init__(
-            application_id="org.bless.hexeditor",
-            flags=Gio.ApplicationFlags.HANDLES_OPEN,
-        )
+        super().__init__(application_id="org.bless.hexeditor",
+                         flags=Gio.ApplicationFlags.HANDLES_OPEN)
         self._window: MainWindow | None = None
 
     def do_activate(self) -> None:
