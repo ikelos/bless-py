@@ -3,19 +3,21 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 import os
 import sys
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk, GLib, Gio
+from gi.repository import Gdk, Gio, GLib, Gtk
 
 from ..buffers.byte_buffer import ByteBuffer
+from ..tools.preferences import Preferences
 from .data_book import DataBook
 from .data_view import DataView
 from .plugins.file_operations import FileOperations
-from ..tools.preferences import Preferences
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -93,20 +95,26 @@ class MainWindow(Gtk.ApplicationWindow):
         _accel("a", ctrl,       self._select_all)
         _accel("r", ctrl_shift, self._show_select_range)
 
+        # File shortcuts
+        _accel("n", ctrl,       lambda: self._file_ops.new_file())
+        _accel("o", ctrl,       lambda: self._file_ops.open_file())
+        _accel("s", ctrl,       lambda: self._file_ops.save_file())
+        _accel("s", ctrl_shift, lambda: self._file_ops.save_file_as())
+
     def _build_menu_bar(self) -> Gtk.MenuBar:
         mb = Gtk.MenuBar()
 
         # File menu
         file_menu = Gtk.Menu()
         for label, cb in (
-            ("_New",          lambda *_: self._file_ops.new_file()),
-            ("_Open…",        lambda *_: self._file_ops.open_file()),
-            ("_Save",         lambda *_: self._file_ops.save_file()),
-            ("Save _As…",     lambda *_: self._file_ops.save_file_as()),
-            ("_Revert",       lambda *_: self._file_ops.revert_file()),
+            ("_New              Ctrl+N",   lambda *_: self._file_ops.new_file()),
+            ("_Open…            Ctrl+O",   lambda *_: self._file_ops.open_file()),
+            ("_Save             Ctrl+S",   lambda *_: self._file_ops.save_file()),
+            ("Save _As…  Shift+Ctrl+S",    lambda *_: self._file_ops.save_file_as()),
+            ("_Revert",                    lambda *_: self._file_ops.revert_file()),
             (None, None),
-            ("_Close",        lambda *_: self._file_ops.close_file()),
-            ("_Quit",         lambda *_: self.get_application().quit()),
+            ("_Close",                     lambda *_: self._file_ops.close_file()),
+            ("_Quit",                      lambda *_: self.get_application().quit()),
         ):
             if label is None:
                 file_menu.append(Gtk.SeparatorMenuItem())
@@ -264,10 +272,7 @@ class MainWindow(Gtk.ApplicationWindow):
     def _on_delete_event(self, widget, event) -> bool:
         # Try to close all pages; if any cancels, block quit
         views = list(self._data_book.views)
-        for dv in views:
-            if not self._file_ops.close_file(dv):
-                return True  # user cancelled
-        return False
+        return any(not self._file_ops.close_file(dv) for dv in views)
 
     def _on_drag_data_received(self, widget, ctx, x, y, data, info, time) -> None:
         uris = data.get_uris()
@@ -368,6 +373,7 @@ class BlessApplication(Gtk.Application):
 
 def main(args: list[str] | None = None) -> int:
     import argparse
+
     from ..logger import setup as _log_setup
 
     if args is None:

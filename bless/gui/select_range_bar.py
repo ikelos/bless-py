@@ -3,17 +3,19 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk
+from gi.repository import Gdk, Gtk
 
 if TYPE_CHECKING:
     from .data_view import DataView
 
 
-def _parse_val(text: str) -> Optional[int]:
+def _parse_val(text: str) -> int | None:
     """Parse a decimal integer or 0x-prefixed hex string.  Returns None if invalid."""
     t = text.strip()
     if not t:
@@ -41,7 +43,7 @@ class SelectRangeBar(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6,
                          margin_top=3, margin_bottom=3,
                          margin_start=6, margin_end=6)
-        self._dv: Optional["DataView"] = None
+        self._dv: DataView | None = None
 
         self.pack_start(Gtk.Label(label="Select range from:"), False, False, 0)
 
@@ -89,7 +91,7 @@ class SelectRangeBar(Gtk.Box):
 
     # ------------------------------------------------------------------
 
-    def attach_view(self, dv: "DataView") -> None:
+    def attach_view(self, dv: DataView) -> None:
         self._dv = dv
 
     def show_bar(self) -> None:

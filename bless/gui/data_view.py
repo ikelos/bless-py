@@ -3,18 +3,23 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 from collections import deque
-from typing import Optional, Callable, TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gdk, GLib, Gtk
 
 from ..buffers.byte_buffer import ByteBuffer
-from ..util.range import Range
 from ..util.base_converter import byte_array_to_string, string_to_byte_array
+from ..util.range import Range
 from .areas.area_group import AreaGroup
+from .data_view_control import DataViewControl
+from .data_view_display import DataViewDisplay
 
 if TYPE_CHECKING:
     from .areas.area import Area
@@ -44,15 +49,12 @@ class DataView:
     """
 
     def __init__(self) -> None:
-        from .data_view_display import DataViewDisplay
-        from .data_view_control import DataViewControl
-
         self._dv_display = DataViewDisplay(self)
         self._dv_control = DataViewControl(self)
         self._dv_display.control = self._dv_control
         self._dv_control.display = self._dv_display
 
-        self._buffer: Optional[ByteBuffer] = None
+        self._buffer: ByteBuffer | None = None
         self._overwrite: bool = False
         self._notification: bool = False
         self._clipdata: bytes = b""
@@ -73,7 +75,7 @@ class DataView:
         # subscribe to preferences
         from ..tools.preferences import Preferences
         self._pref_id = f"dv{id(self)}"
-        p = Preferences.instance()
+        Preferences.instance()
         Preferences.proxy().subscribe("Undo.Limited",      self._pref_id, lambda pr: self._on_prefs_changed(pr))
         Preferences.proxy().subscribe("Undo.Actions",      self._pref_id, lambda pr: self._on_prefs_changed(pr))
         Preferences.proxy().subscribe("ByteBuffer.TempDir",self._pref_id, lambda pr: self._on_prefs_changed(pr))
@@ -83,19 +85,19 @@ class DataView:
     # ------------------------------------------------------------------
 
     @property
-    def display(self) -> "DataViewDisplay":
+    def display(self) -> DataViewDisplay:
         return self._dv_display
 
     @property
-    def control(self) -> "DataViewControl":
+    def control(self) -> DataViewControl:
         return self._dv_control
 
     @property
-    def buffer(self) -> Optional[ByteBuffer]:
+    def buffer(self) -> ByteBuffer | None:
         return self._buffer
 
     @buffer.setter
-    def buffer(self, bb: Optional[ByteBuffer]) -> None:
+    def buffer(self, bb: ByteBuffer | None) -> None:
         if bb is not None:
             self._setup_buffer(bb)
         else:
@@ -147,7 +149,7 @@ class DataView:
         self.set_selection(r.start, r.end)
 
     @property
-    def focused_area(self) -> Optional["Area"]:
+    def focused_area(self) -> Area | None:
         return self._dv_display.area_group.focused_area
 
     @property
@@ -240,8 +242,6 @@ class DataView:
         def _idle():
             self._dv_display.show_file_changed_bar()
             self.notification = True
-            if self._buffer:
-                self._buffer.file_ops_allowed = False
             return False
         GLib.idle_add(_idle)
 
@@ -462,7 +462,7 @@ class DataView:
         ]
         self._clipboard.set_with_data(targets, get_func, lambda *a: None)
 
-    def _get_paste_data(self) -> Optional[bytes]:
+    def _get_paste_data(self) -> bytes | None:
         atype = self._area_type()
         base_map = {"hexadecimal": 16, "decimal": 10,
                     "octal": 8, "binary": 2}

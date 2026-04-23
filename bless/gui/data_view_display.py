@@ -3,24 +3,26 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk
+from gi.repository import Gdk, Gtk
 
 from .areas.area_group import AreaGroup
-from .areas.concrete_areas import HexArea, AsciiArea, OffsetArea, SeparatorArea
+from .areas.concrete_areas import AsciiArea, HexArea, OffsetArea, SeparatorArea
 from .conversion_panel import ConversionPanel
 from .find_bar import FindBar, FindReplaceBar
 from .goto_offset import GotoOffsetBar
 from .select_range_bar import SelectRangeBar
 
 if TYPE_CHECKING:
+    from .areas.area import Area
     from .data_view import DataView
     from .data_view_control import DataViewControl
-    from .areas.area import Area
 
 
 class DataViewDisplay(Gtk.Box):
@@ -32,10 +34,10 @@ class DataViewDisplay(Gtk.Box):
       └── ConversionPanel (always shown)
     """
 
-    def __init__(self, dv: "DataView") -> None:
+    def __init__(self, dv: DataView) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._dv = dv
-        self._control: Optional["DataViewControl"] = None
+        self._control: DataViewControl | None = None
         self._realized = False
 
         # ── Area group ────────────────────────────────────────────────
@@ -71,6 +73,8 @@ class DataViewDisplay(Gtk.Box):
         self._file_changed_bar.get_content_area().pack_start(lbl, False, False, 0)
         self._file_changed_bar.add_button("Reload", Gtk.ResponseType.YES)
         self._file_changed_bar.connect("response", self._on_file_changed_response)
+        # Hide before show_all() so it never auto-appears on first render
+        self._file_changed_bar.set_no_show_all(True)
 
         # ── Find / replace / goto / select-range bars ─────────────────
         self._find_bar         = FindBar()
@@ -133,11 +137,11 @@ class DataViewDisplay(Gtk.Box):
         return self._vscroll
 
     @property
-    def control(self) -> Optional["DataViewControl"]:
+    def control(self) -> DataViewControl | None:
         return self._control
 
     @control.setter
-    def control(self, c: "DataViewControl") -> None:
+    def control(self, c: DataViewControl) -> None:
         self._control = c
 
     @property
@@ -248,18 +252,26 @@ class DataViewDisplay(Gtk.Box):
             self._on_scrolled(adj)
 
         if show_type == "closest":
-            if   cur_row > tgt_row:  show_type = "start"
-            elif end_row < tgt_row:  show_type = "end"
-            else: return
+            if cur_row > tgt_row:
+                show_type = "start"
+            elif end_row < tgt_row:
+                show_type = "end"
+            else:
+                return
 
-        if   show_type == "start":  _set(tgt_row)
-        elif show_type == "end":    _set(max(0, tgt_row - nrows + 1))
+        if show_type == "start":
+            _set(tgt_row)
+        elif show_type == "end":
+            _set(max(0, tgt_row - nrows + 1))
         elif show_type == "cursor":
             cur_row2 = ag.cursor_offset // bpr
             diff = cur_row2 - cur_row
-            if   0 <= diff <= nrows:  _set(tgt_row - diff)
-            elif diff > nrows:        _set(max(0, tgt_row - nrows + 1))
-            else:                     _set(tgt_row)
+            if 0 <= diff <= nrows:
+                _set(tgt_row - diff)
+            elif diff > nrows:
+                _set(max(0, tgt_row - nrows + 1))
+            else:
+                _set(tgt_row)
 
     def grab_keyboard_focus(self) -> None:
         self._drawing_area.grab_focus()
@@ -276,6 +288,7 @@ class DataViewDisplay(Gtk.Box):
         self._drawing_area.queue_draw()
 
     def show_file_changed_bar(self) -> None:
+        self._file_changed_bar.set_no_show_all(False)
         self._file_changed_bar.show_all()
 
     @property
@@ -381,4 +394,9 @@ class DataViewDisplay(Gtk.Box):
     def _on_file_changed_response(self, bar, response) -> None:
         if response == Gtk.ResponseType.YES:
             self._dv.revert()
+        # Reset state so the bar can reappear on the next real change
+        self._dv.notification = False
+        if self._dv.buffer:
+            self._dv.buffer.file_ops_allowed = True
+        bar.set_no_show_all(True)
         bar.hide()

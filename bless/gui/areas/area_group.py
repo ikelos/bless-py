@@ -3,20 +3,23 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
+
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk
 import cairo
+from gi.repository import Gdk, Gtk
 
-from ..drawers import HighlightType
-from ...util.range import Range
 from ...util.interval_tree import IntervalTree
+from ...util.range import Range
+from ..drawers import HighlightType
 
 if TYPE_CHECKING:
-    from .area import Area
     from ...buffers.byte_buffer import ByteBuffer
+    from .area import Area
 
 
 class Highlight(Range):
@@ -41,10 +44,10 @@ class AreaGroup:
     """
 
     def __init__(self) -> None:
-        self._areas: list["Area"] = []
-        self._buffer: Optional["ByteBuffer"] = None
-        self._drawing_area: Optional[Gtk.DrawingArea] = None
-        self._focused_area: Optional["Area"] = None
+        self._areas: list[Area] = []
+        self._buffer: ByteBuffer | None = None
+        self._drawing_area: Gtk.DrawingArea | None = None
+        self._focused_area: Area | None = None
 
         self._offset: int = 0
         self._cursor_offset: int = 0
@@ -55,29 +58,29 @@ class AreaGroup:
         self._highlights.insert(self._selection)
         self._pattern_highlights: list[Highlight] = []
 
-        self._buffer_cache: Optional[bytearray] = None
+        self._buffer_cache: bytearray | None = None
 
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
 
     @property
-    def areas(self) -> list["Area"]:
+    def areas(self) -> list[Area]:
         return self._areas
 
     @property
-    def buffer(self) -> Optional["ByteBuffer"]:
+    def buffer(self) -> ByteBuffer | None:
         return self._buffer
 
     @buffer.setter
-    def buffer(self, bb: Optional["ByteBuffer"]) -> None:
+    def buffer(self, bb: ByteBuffer | None) -> None:
         self._buffer = bb
         self._offset = 0
         self._cursor_offset = 0
         self._rebuild_cache()
 
     @property
-    def drawing_area(self) -> Optional[Gtk.DrawingArea]:
+    def drawing_area(self) -> Gtk.DrawingArea | None:
         return self._drawing_area
 
     @drawing_area.setter
@@ -85,11 +88,11 @@ class AreaGroup:
         self._drawing_area = da
 
     @property
-    def focused_area(self) -> Optional["Area"]:
+    def focused_area(self) -> Area | None:
         return self._focused_area
 
     @focused_area.setter
-    def focused_area(self, area: Optional["Area"]) -> None:
+    def focused_area(self, area: Area | None) -> None:
         # Remove cursor focus from every area first
         for a in self._areas:
             a._cursor_focus = False

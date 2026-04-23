@@ -3,14 +3,16 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
 
 import gi
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib
 
-from ...tools.find import BMFindStrategy, SimpleFindStrategy, FindOperation
-from ...util.base_converter import string_to_byte_array, byte_array_to_string
+gi.require_version("Gtk", "3.0")
+from gi.repository import GLib, Gtk
+
+from ...tools.find import BMFindStrategy, FindOperation, SimpleFindStrategy
+from ...util.base_converter import byte_array_to_string, string_to_byte_array
 from ...util.range import Range
 
 if TYPE_CHECKING:
@@ -34,11 +36,11 @@ class FindReplaceDialog(Gtk.Dialog):
         "ASCII":       None,  # raw bytes
     }
 
-    def __init__(self, data_book: "DataBook", parent: Gtk.Window) -> None:
+    def __init__(self, data_book: DataBook, parent: Gtk.Window) -> None:
         super().__init__(title="Find & Replace", parent=parent,
                          flags=Gtk.DialogFlags.DESTROY_WITH_PARENT)
         self._book    = data_book
-        self._op: Optional[FindOperation] = None
+        self._op: FindOperation | None = None
 
         self.set_resizable(True)
         self.set_default_size(480, -1)
@@ -108,7 +110,7 @@ class FindReplaceDialog(Gtk.Dialog):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _parse_entry(self, text: str) -> Optional[bytes]:
+    def _parse_entry(self, text: str) -> bytes | None:
         fmt_name = self._fmt_combo.get_active_text()
         base = self._BASE_MAP.get(fmt_name)
         if not text.strip():

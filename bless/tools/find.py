@@ -5,10 +5,11 @@
 from __future__ import annotations
 
 import threading
-from typing import Optional, Callable
+from collections.abc import Callable
+from typing import Optional
 
-from ..util.range import Range
 from ..buffers.byte_buffer import ByteBuffer
+from ..util.range import Range
 
 ProgressCallback = Callable[[object, str], bool]
 
@@ -24,7 +25,7 @@ class IFindStrategy:
     def pattern(self, v: bytes) -> None: ...
 
     @property
-    def buffer(self) -> Optional[ByteBuffer]: ...
+    def buffer(self) -> ByteBuffer | None: ...
     @buffer.setter
     def buffer(self, v: ByteBuffer) -> None: ...
 
@@ -38,8 +39,8 @@ class IFindStrategy:
     @cancelled.setter
     def cancelled(self, v: bool) -> None: ...
 
-    def find_next(self, limit: int = -1) -> Optional[Range]: ...
-    def find_previous(self, limit: int = 0) -> Optional[Range]: ...
+    def find_next(self, limit: int = -1) -> Range | None: ...
+    def find_previous(self, limit: int = 0) -> Range | None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +55,7 @@ class BMFindStrategy(IFindStrategy):
 
     def __init__(self) -> None:
         self._pattern = b""
-        self._buffer: Optional[ByteBuffer] = None
+        self._buffer: ByteBuffer | None = None
         self._pos: int = 0
         self._cancelled: bool = False
         self._skip: list[int] = [0] * 256
@@ -79,7 +80,7 @@ class BMFindStrategy(IFindStrategy):
         self._update_skip_tables()
 
     @property
-    def buffer(self) -> Optional[ByteBuffer]:
+    def buffer(self) -> ByteBuffer | None:
         return self._buffer
 
     @buffer.setter
@@ -105,7 +106,7 @@ class BMFindStrategy(IFindStrategy):
 
     # ---- forward search ----
 
-    def _find_next_single(self, limit: int) -> Optional[Range]:
+    def _find_next_single(self, limit: int) -> Range | None:
         b = self._pattern[0]
         buf = self._buffer
         while self._pos < limit and buf[self._pos] != b and not self._cancelled:
@@ -116,7 +117,7 @@ class BMFindStrategy(IFindStrategy):
         self._pos += 1
         return r
 
-    def find_next(self, limit: int = -1) -> Optional[Range]:
+    def find_next(self, limit: int = -1) -> Range | None:
         buf = self._buffer
         plen = len(self._pattern)
         buf_len = buf.size
@@ -153,7 +154,7 @@ class BMFindStrategy(IFindStrategy):
 
     # ---- backward search ----
 
-    def _find_previous_single(self, limit: int) -> Optional[Range]:
+    def _find_previous_single(self, limit: int) -> Range | None:
         b = self._pattern[0]
         buf = self._buffer
         self._pos -= 1
@@ -164,7 +165,7 @@ class BMFindStrategy(IFindStrategy):
             return None
         return Range(self._pos, self._pos)
 
-    def find_previous(self, limit: int = 0) -> Optional[Range]:
+    def find_previous(self, limit: int = 0) -> Range | None:
         buf = self._buffer
         plen = len(self._pattern)
         if limit < 0:
@@ -206,7 +207,7 @@ class SimpleFindStrategy(IFindStrategy):
 
     def __init__(self) -> None:
         self._pattern = b""
-        self._buffer: Optional[ByteBuffer] = None
+        self._buffer: ByteBuffer | None = None
         self._pos: int = 0
         self._cancelled: bool = False
 
@@ -219,7 +220,7 @@ class SimpleFindStrategy(IFindStrategy):
         self._pattern = bytes(v)
 
     @property
-    def buffer(self) -> Optional[ByteBuffer]:
+    def buffer(self) -> ByteBuffer | None:
         return self._buffer
 
     @buffer.setter
@@ -243,7 +244,7 @@ class SimpleFindStrategy(IFindStrategy):
     def cancelled(self, v: bool) -> None:
         self._cancelled = v
 
-    def find_next(self, limit: int = -1) -> Optional[Range]:
+    def find_next(self, limit: int = -1) -> Range | None:
         buf = self._buffer
         buf_len = buf.size
         plen = len(self._pattern)
@@ -264,7 +265,7 @@ class SimpleFindStrategy(IFindStrategy):
             return Range(pos - plen, pos - 1)
         return None
 
-    def find_previous(self, limit: int = 0) -> Optional[Range]:
+    def find_previous(self, limit: int = 0) -> Range | None:
         buf = self._buffer
         plen = len(self._pattern)
         if limit < 0:
@@ -297,15 +298,15 @@ class FindOperation:
 
     def __init__(self, strategy: IFindStrategy,
                  forward: bool = True,
-                 progress_cb: Optional[ProgressCallback] = None,
-                 done_cb: Optional[Callable] = None) -> None:
+                 progress_cb: ProgressCallback | None = None,
+                 done_cb: Callable | None = None) -> None:
         self._strategy = strategy
         self._forward = forward
         self._progress_cb = progress_cb
         self._done_cb = done_cb
-        self.match: Optional[Range] = None
+        self.match: Range | None = None
         self._finished = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         # We do NOT lock the buffer here: find is read-only and must not
         # block the GTK thread from rendering while the search runs.
 

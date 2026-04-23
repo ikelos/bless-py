@@ -3,11 +3,13 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gdk, GLib, Gtk
 
 from ..tools.find import BMFindStrategy, FindOperation
 from ..util.base_converter import string_to_byte_array
@@ -21,7 +23,7 @@ _BASE_MAP = {
 }
 
 
-def _parse(text: str, fmt: str) -> Optional[bytes]:
+def _parse(text: str, fmt: str) -> bytes | None:
     text = text.strip()
     if not text:
         return b""
@@ -49,8 +51,8 @@ class _BaseBar(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=4,
                          margin_top=2, margin_bottom=2,
                          margin_start=4, margin_end=4)
-        self._dv: Optional["DataView"] = None
-        self._op: Optional[FindOperation] = None
+        self._dv: DataView | None = None
+        self._op: FindOperation | None = None
 
         close = Gtk.Button()
         close.set_relief(Gtk.ReliefStyle.NONE)
@@ -63,7 +65,7 @@ class _BaseBar(Gtk.Box):
         self._status.set_width_chars(24)
         self.pack_end(self._status, False, False, 0)
 
-    def attach_view(self, dv: "DataView") -> None:
+    def attach_view(self, dv: DataView) -> None:
         self._dv = dv
 
     def hide_bar(self) -> None:

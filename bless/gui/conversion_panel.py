@@ -3,10 +3,12 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 import struct
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Pango
 
@@ -44,7 +46,7 @@ class ConversionPanel(Gtk.Frame):
         super().__init__(label=None)
         self.set_shadow_type(Gtk.ShadowType.NONE)
 
-        self._dv: Optional["DataView"] = None
+        self._dv: DataView | None = None
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add(vbox)
@@ -126,7 +128,7 @@ class ConversionPanel(Gtk.Frame):
         self._current_bytes  = b""
         self._current_offset = 0
 
-    def attach_view(self, dv: "DataView") -> None:
+    def attach_view(self, dv: DataView) -> None:
         self._dv = dv
         dv.connect_cursor_changed(lambda _: self._refresh_full())
         dv.connect_selection_changed(lambda _: self._refresh_full())
@@ -136,7 +138,8 @@ class ConversionPanel(Gtk.Frame):
     def _refresh_full(self) -> None:
         dv = self._dv
         if dv is None or dv.buffer is None:
-            self._clear(); return
+            self._clear()
+            return
         buf    = dv.buffer
         offset = max(0, min(dv.cursor_offset, buf.size - 1)) if buf.size > 0 else 0
         n = min(8, max(0, buf.size - offset))

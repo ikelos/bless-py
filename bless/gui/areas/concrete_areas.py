@@ -6,18 +6,28 @@
 #   OffsetArea, HexArea, AsciiArea, DecimalArea, OctalArea, BinaryArea, SeparatorArea
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 import gi
+
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk
 
+from ..drawers import (
+    AsciiDrawer,
+    BinaryDrawer,
+    ColumnType,
+    DecimalDrawer,
+    DrawerInfo,
+    HexDrawer,
+    HighlightType,
+    OctalDrawer,
+    OffsetHexDrawer,
+    RowType,
+)
 from .area import Area, GetOffsetFlags, register_area
 from .area_group import AreaGroup
-from ..drawers import (
-    DrawerInfo, HighlightType, RowType, ColumnType,
-    HexDrawer, AsciiDrawer, DecimalDrawer, OctalDrawer,
-    BinaryDrawer, OffsetHexDrawer,
-)
 
 if TYPE_CHECKING:
     pass
@@ -529,10 +539,23 @@ class SeparatorArea(Area):
             return
         cr = self._cr
         cr.save()
-        # Use a subtle dark-grey rather than solid black, matching the original
-        cr.set_source_rgba(0.3, 0.3, 0.3, 1.0)
+        # Fill background with the hex-area background colour so it's never black
+        ag = self.area_group
+        bg_color = None
+        for a in ag.areas:
+            if a.drawer and hasattr(a.drawer, "get_background_color"):
+                from ..drawers import HighlightType, RowType
+                bg_color = a.drawer.get_background_color(RowType.Even, HighlightType.Normal)
+                break
+        if bg_color:
+            cr.set_source_rgba(bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha)
+        else:
+            cr.set_source_rgb(1.0, 1.0, 1.0)
+        cr.rectangle(self.x, self.y, self.width, self.height)
+        cr.fill()
+        # Draw a subtle 1px dark-grey vertical line centred in the column
+        cr.set_source_rgba(0.35, 0.35, 0.35, 1.0)
         mid = self.x + self.width // 2
-        # Snap to pixel grid for a crisp 1-px line
         cr.set_line_width(1.0)
         cr.move_to(mid + 0.5, self.y)
         cr.line_to(mid + 0.5, self.y + self.height)

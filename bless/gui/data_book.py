@@ -3,10 +3,13 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 import os
-from typing import Optional, Callable
+from collections.abc import Callable
+from typing import Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
@@ -92,7 +95,7 @@ class DataBook(Gtk.Notebook):
             h(dv)
 
     @property
-    def current_view(self) -> Optional[DataView]:
+    def current_view(self) -> DataView | None:
         n = self.get_current_page()
         if n < 0 or n >= len(self._views):
             return None

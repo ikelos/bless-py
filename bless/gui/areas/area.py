@@ -3,16 +3,19 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional, Callable
+from collections.abc import Callable
 from enum import IntFlag
+from typing import TYPE_CHECKING, Optional
 
 import gi
-gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk
-import cairo
 
-from ..drawers import Drawer, DrawerInfo, HighlightType, RowType, ColumnType
+gi.require_version("Gdk", "3.0")
+import cairo
+from gi.repository import Gdk
+
+from ..drawers import ColumnType, Drawer, DrawerInfo, HighlightType, RowType
 
 if TYPE_CHECKING:
     from .area_group import AreaGroup
@@ -31,7 +34,7 @@ def register_area(name: str, creator: AreaCreatorFunc) -> None:
     _factory[name] = creator
 
 
-def create_area(name: str, ag: "AreaGroup") -> Optional["Area"]:
+def create_area(name: str, ag: AreaGroup) -> Area | None:
     fn = _factory.get(name)
     return fn(ag) if fn else None
 
@@ -47,9 +50,9 @@ class Area(ABC):
       - handle keyboard input
     """
 
-    def __init__(self, area_group: "AreaGroup") -> None:
+    def __init__(self, area_group: AreaGroup) -> None:
         self.area_group = area_group
-        self.drawer: Optional[Drawer] = None
+        self.drawer: Drawer | None = None
         self.drawer_info = DrawerInfo()
         self.area_type: str = ""
 
@@ -61,7 +64,7 @@ class Area(ABC):
         self.dpb: int = 0          # digits per byte
         self.fixed_bpr: int = -1   # -1 means auto
 
-        self._cr: Optional[cairo.Context] = None
+        self._cr: cairo.Context | None = None
         self._realized: bool = False
         self._can_focus: bool = False
         self._cursor_digit: int = 0

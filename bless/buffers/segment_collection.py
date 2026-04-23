@@ -3,7 +3,8 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from .segment import Segment, LinkedList, ListNode
+
+from .segment import LinkedList, ListNode, Segment
 
 
 class SegmentCollection:
@@ -121,7 +122,7 @@ class SegmentCollection:
     # Insert
     # ------------------------------------------------------------------
 
-    def insert(self, sc: "SegmentCollection", offset: int) -> None:
+    def insert(self, sc: SegmentCollection, offset: int) -> None:
         """Insert all segments of *sc* at *offset* in this collection."""
         s, mapping, node = self.find_segment(offset)
 
@@ -158,7 +159,7 @@ class SegmentCollection:
 
     def delete_range(
         self, pos1: int, pos2: int
-    ) -> "SegmentCollection | None":
+    ) -> SegmentCollection | None:
         """
         Remove bytes [pos1, pos2] inclusive from the collection.
 
@@ -243,7 +244,7 @@ class SegmentCollection:
     # Get range (non-destructive copy)
     # ------------------------------------------------------------------
 
-    def get_range(self, pos1: int, pos2: int) -> "SegmentCollection | None":
+    def get_range(self, pos1: int, pos2: int) -> SegmentCollection | None:
         """Return a new SegmentCollection covering [pos1, pos2] without modifying self."""
         s2, mapping2, node2 = self.find_segment(pos2)
         s1, mapping1, node1 = self.find_segment(pos1)

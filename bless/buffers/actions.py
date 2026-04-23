@@ -3,13 +3,14 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from .file_buffer import FileBuffer
 from .segment import Segment
 from .segment_collection import SegmentCollection
 from .simple_buffer import SimpleBuffer
-from .file_buffer import FileBuffer
 
 if TYPE_CHECKING:
     from .byte_buffer import ByteBuffer
@@ -24,10 +25,10 @@ class ByteBufferAction(ABC):
     @abstractmethod
     def undo(self) -> None: ...
 
-    def make_private_copy(self) -> None:
-        pass
+    def make_private_copy(self) -> None:  # optional override
+        return
 
-    def private_copy_size(self) -> int:
+    def private_copy_size(self) -> int:  # optional override
         return 0
 
 
@@ -36,7 +37,7 @@ class ByteBufferAction(ABC):
 # ---------------------------------------------------------------------------
 
 class AppendAction(ByteBufferAction):
-    def __init__(self, data: bytes, index: int, length: int, bb: "ByteBuffer") -> None:
+    def __init__(self, data: bytes, index: int, length: int, bb: ByteBuffer) -> None:
         self._bb = bb
         if length == 0:
             self._seg: Segment | None = None
@@ -63,7 +64,7 @@ class AppendAction(ByteBufferAction):
 # ---------------------------------------------------------------------------
 
 class InsertAction(ByteBufferAction):
-    def __init__(self, pos: int, data: bytes, index: int, length: int, bb: "ByteBuffer") -> None:
+    def __init__(self, pos: int, data: bytes, index: int, length: int, bb: ByteBuffer) -> None:
         self._bb = bb
         self._pos = pos
         if length == 0:
@@ -93,7 +94,7 @@ class InsertAction(ByteBufferAction):
 # ---------------------------------------------------------------------------
 
 class DeleteAction(ByteBufferAction):
-    def __init__(self, pos1: int, pos2: int, bb: "ByteBuffer") -> None:
+    def __init__(self, pos1: int, pos2: int, bb: ByteBuffer) -> None:
         self._bb = bb
         self._pos1 = pos1
         self._pos2 = pos2
@@ -131,7 +132,7 @@ class DeleteAction(ByteBufferAction):
 
 class ReplaceAction(ByteBufferAction):
     def __init__(self, pos1: int, pos2: int, data: bytes, index: int, length: int,
-                 bb: "ByteBuffer") -> None:
+                 bb: ByteBuffer) -> None:
         self._del = DeleteAction(pos1, pos2, bb)
         self._ins = InsertAction(pos1, data, index, length, bb)
 

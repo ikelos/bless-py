@@ -3,25 +3,28 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk
+from gi.repository import Gdk, Gtk
 
 from ..util.range import Range
 from .areas.area import GetOffsetFlags
 
 if TYPE_CHECKING:
-    from .data_view import DataView, CursorState
-    from .data_view_display import DataViewDisplay
     from .areas.area import Area
+    from .data_view import CursorState, DataView
+    from .data_view_display import DataViewDisplay
 
 
 class _Pos:
     """Cursor/selection position.
-    `second` is the byte the cursor sits on; `first` is second-1 (used only
+    `second` is the byte the cursor sits on
+    `first` is second-1 (used only
     when extending a selection leftward over an 'abyss' boundary).
     """
     __slots__ = ("first", "second", "digit")
@@ -31,7 +34,7 @@ class _Pos:
         self.second = second
         self.digit  = digit
 
-    def copy(self) -> "_Pos":
+    def copy(self) -> _Pos:
         return _Pos(self.first, self.second, self.digit)
 
 
@@ -41,16 +44,16 @@ class DataViewControl:
     Translates raw GTK events into DataView cursor / selection / edit calls.
     """
 
-    def __init__(self, dv: "DataView") -> None:
+    def __init__(self, dv: DataView) -> None:
         self._dv = dv
-        self._display: Optional["DataViewDisplay"] = None
+        self._display: DataViewDisplay | None = None
 
         self._sel_start = _Pos()
         self._sel_end   = _Pos()
         # True while the mouse button is held for a drag-select
         self._mouse_selecting = False
 
-        self._okp_focus_area: Optional["Area"] = None
+        self._okp_focus_area: Area | None = None
         self._okp_bpr = 1
         self._okp_dpb = 2
         self._okp_show_type = "closest"
@@ -58,11 +61,11 @@ class DataViewControl:
         self._im_context = Gtk.IMContextSimple()
 
     @property
-    def display(self) -> Optional["DataViewDisplay"]:
+    def display(self) -> DataViewDisplay | None:
         return self._display
 
     @display.setter
-    def display(self, d: "DataViewDisplay") -> None:
+    def display(self, d: DataViewDisplay) -> None:
         self._display = d
 
     def reset_selection(self) -> None:
@@ -75,9 +78,10 @@ class DataViewControl:
     # Helper: area at (x, y)
     # ------------------------------------------------------------------
 
-    def _area_at(self, x: int, y: int) -> Optional["Area"]:
+    def _area_at(self, x: int, y: int) -> Area | None:
         """Return the focusable Area whose column contains screen-x.
-        Separator and offset areas cannot be focused; fall back to nearest."""
+        Separator and offset areas cannot be focused
+        fall back to nearest."""
         if self._display is None:
             return None
         areas = self._display.area_group.areas
@@ -101,7 +105,7 @@ class DataViewControl:
     # Offset / position calculation
     # ------------------------------------------------------------------
 
-    def _calc_pos(self, area: "Area", x: int, y: int) -> _Pos:
+    def _calc_pos(self, area: Area, x: int, y: int) -> _Pos:
         """Map area-relative pixel (x,y) to a _Pos."""
         off, digit, flags = area.get_offset_by_display_info(x, y)
         buf = self._dv.buffer
@@ -166,7 +170,7 @@ class DataViewControl:
     # Focus
     # ------------------------------------------------------------------
 
-    def _update_focus(self, area: "Area") -> None:
+    def _update_focus(self, area: Area) -> None:
         if self._display is None:
             return
         ag = self._display.area_group
@@ -256,21 +260,29 @@ class DataViewControl:
         handled = False
 
         if key == Gdk.KEY_Left:
-            self._key_left(cur, nxt);   handled = True
+            self._key_left(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_Right:
-            self._key_right(cur, nxt);  handled = True
+            self._key_right(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_Up:
-            self._key_up(cur, nxt);     handled = True
+            self._key_up(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_Down:
-            self._key_down(cur, nxt);   handled = True
+            self._key_down(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_Page_Up:
-            self._key_page_up(cur, nxt);   handled = True
+            self._key_page_up(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_Page_Down:
-            self._key_page_down(cur, nxt); handled = True
+            self._key_page_down(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_Home:
-            self._key_home(cur, nxt);  handled = True
+            self._key_home(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_End:
-            self._key_end(cur, nxt);   handled = True
+            self._key_end(cur, nxt)
+            handled = True
         elif key == Gdk.KEY_Insert:
             dv.overwrite = not dv.overwrite
             return True
@@ -345,7 +357,9 @@ class DataViewControl:
         adj = self._display.vscroll.get_adjustment()
         off = max(0, cur.second - self._okp_bpr * int(adj.get_page_increment()))
         self._okp_show_type = "cursor"
-        nxt.first = off - 1; nxt.second = off; nxt.digit = cur.digit
+        nxt.first = off - 1
+        nxt.second = off
+        nxt.digit = cur.digit
 
     def _key_page_down(self, cur: _Pos, nxt: _Pos) -> None:
         adj = self._display.vscroll.get_adjustment()
@@ -353,16 +367,22 @@ class DataViewControl:
         limit = buf.size if buf else 0
         off = min(limit, cur.second + self._okp_bpr * int(adj.get_page_increment()))
         self._okp_show_type = "cursor"
-        nxt.first = off - 1; nxt.second = off; nxt.digit = cur.digit
+        nxt.first = off - 1
+        nxt.second = off
+        nxt.digit = cur.digit
 
     def _key_home(self, cur: _Pos, nxt: _Pos) -> None:
-        nxt.first = -1; nxt.second = 0; nxt.digit = 0
+        nxt.first = -1
+        nxt.second = 0
+        nxt.digit = 0
         self._okp_show_type = "start"
 
     def _key_end(self, cur: _Pos, nxt: _Pos) -> None:
         buf = self._dv.buffer
         s = buf.size if buf else 0
-        nxt.first = s - 1; nxt.second = s; nxt.digit = 0
+        nxt.first = s - 1
+        nxt.second = s
+        nxt.digit = 0
         self._okp_show_type = "end"
 
     def _key_default(self, event: Gdk.EventKey,

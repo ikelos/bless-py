@@ -7,25 +7,23 @@
 # overlap queries can prune early.
 
 from __future__ import annotations
-from typing import Generic, TypeVar, Optional
+
+from typing import Generic, Optional, TypeVar
 
 from .range import Range
 
 _RED = True
 _BLACK = False
 
-T = TypeVar("T")   # must have .start and .end attributes (compatible with Range)
-
-
-class _Node(Generic[T]):
+class _Node[T]:
     __slots__ = ("key", "values", "max_end", "left", "right", "red")
 
     def __init__(self, key: int, value: T) -> None:
         self.key: int = key
         self.values: list[T] = [value]
         self.max_end: int = value.end  # type: ignore[attr-defined]
-        self.left: Optional[_Node[T]] = None
-        self.right: Optional[_Node[T]] = None
+        self.left: _Node[T] | None = None
+        self.right: _Node[T] | None = None
         self.red: bool = True
 
     def update_max(self) -> None:
@@ -37,7 +35,7 @@ class _Node(Generic[T]):
         self.max_end = m
 
 
-class IntervalTree(Generic[T]):
+class IntervalTree[T]:
     """
     A minimal interval tree supporting:
       - insert(item)       — item must have .start and .end
@@ -47,7 +45,7 @@ class IntervalTree(Generic[T]):
     """
 
     def __init__(self) -> None:
-        self._root: Optional[_Node[T]] = None
+        self._root: _Node[T] | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -84,7 +82,7 @@ class IntervalTree(Generic[T]):
     # Search
     # ------------------------------------------------------------------
 
-    def _search(self, node: Optional[_Node[T]], r: Range, out: list[T]) -> None:
+    def _search(self, node: _Node[T] | None, r: Range, out: list[T]) -> None:
         if node is None or node.max_end < r.start:
             return
         # left subtree may contain overlaps
@@ -102,7 +100,7 @@ class IntervalTree(Generic[T]):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _is_red(n: Optional[_Node]) -> bool:
+    def _is_red(n: _Node | None) -> bool:
         return n is not None and n.red
 
     def _rotate_left(self, h: _Node[T]) -> _Node[T]:
@@ -128,10 +126,12 @@ class IntervalTree(Generic[T]):
     @staticmethod
     def _flip_colors(h: _Node) -> None:
         h.red = not h.red
-        if h.left:  h.left.red = not h.left.red
-        if h.right: h.right.red = not h.right.red
+        if h.left:
+            h.left.red = not h.left.red
+        if h.right:
+            h.right.red = not h.right.red
 
-    def _insert(self, h: Optional[_Node[T]], key: int, val: T) -> _Node[T]:
+    def _insert(self, h: _Node[T] | None, key: int, val: T) -> _Node[T]:
         if h is None:
             return _Node(key, val)
 
@@ -160,8 +160,8 @@ class IntervalTree(Generic[T]):
     # Delete (simplified: remove one item from node's values list)
     # ------------------------------------------------------------------
 
-    def _delete_item(self, h: Optional[_Node[T]], key: int,
-                     val: T) -> tuple[Optional[_Node[T]], bool]:
+    def _delete_item(self, h: _Node[T] | None, key: int,
+                     val: T) -> tuple[_Node[T] | None, bool]:
         """Return (new_root, deleted)."""
         if h is None:
             return None, False
@@ -187,7 +187,7 @@ class IntervalTree(Generic[T]):
             h.update_max()
         return h, deleted
 
-    def _remove_node(self, h: _Node[T]) -> Optional[_Node[T]]:
+    def _remove_node(self, h: _Node[T]) -> _Node[T] | None:
         """Remove the node itself, returning a replacement."""
         if h.left is None:
             return h.right
@@ -206,7 +206,7 @@ class IntervalTree(Generic[T]):
             n = n.left
         return n
 
-    def _delete_min(self, h: _Node[T]) -> Optional[_Node[T]]:
+    def _delete_min(self, h: _Node[T]) -> _Node[T] | None:
         if h.left is None:
             return h.right
         h.left = self._delete_min(h.left)

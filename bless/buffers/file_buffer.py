@@ -4,6 +4,7 @@
 
 import os
 import stat
+
 from .ibuffer import IBuffer
 
 # ioctl for block device size on Linux
@@ -79,7 +80,7 @@ class FileBuffer(IBuffer):
         else:
             raise NotImplementedError("File object is not a regular file or block device.")
 
-        self._fp = open(filename, "rb")
+        self._fp = open(filename, "rb")  # noqa: SIM115
         self._filename = filename
 
         # Pre-load the window

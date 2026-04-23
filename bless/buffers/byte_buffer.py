@@ -4,21 +4,27 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
-import threading
 import tempfile
+import threading
 from collections import deque
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Optional
 
-from .ibuffer import IBuffer
-from .simple_buffer import SimpleBuffer
+from .actions import (
+    AppendAction,
+    ByteBufferAction,
+    DeleteAction,
+    InsertAction,
+    MultiAction,
+    ReplaceAction,
+)
 from .file_buffer import FileBuffer
+from .ibuffer import IBuffer
 from .segment import Segment
 from .segment_collection import SegmentCollection
-from .actions import (
-    ByteBufferAction, AppendAction, InsertAction,
-    DeleteAction, ReplaceAction, MultiAction,
-)
+from .simple_buffer import SimpleBuffer
 
 # Progress callback type:  fn(value: float|str, action: str) -> bool
 ProgressCallback = Callable[[object, str], bool]
@@ -48,12 +54,12 @@ class ByteBuffer:
 
     def __init__(self) -> None:
         self._seg_col = SegmentCollection()
-        self._file_buf: Optional[FileBuffer] = None
+        self._file_buf: FileBuffer | None = None
         self._size: int = 0
 
         self._undo_deque: deque[ByteBufferAction] = deque()
         self._redo_deque: deque[ByteBufferAction] = deque()
-        self._save_checkpoint: Optional[ByteBufferAction] = None
+        self._save_checkpoint: ByteBufferAction | None = None
 
         n = _next_auto_num()
         self._auto_filename: str = f"Untitled {n}"
@@ -71,11 +77,11 @@ class ByteBuffer:
         # action chaining
         self._chaining: bool = False
         self._chaining_first: bool = False
-        self._multi_action: Optional[MultiAction] = None
+        self._multi_action: MultiAction | None = None
 
         # async save
         self._save_finished = threading.Event()
-        self._user_save_callback: Optional[Callable] = None
+        self._user_save_callback: Callable | None = None
         self._use_glib_idle: bool = False
 
         # file-watcher (inotify via watchdog if available, else poll)
@@ -130,7 +136,7 @@ class ByteBuffer:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_file(cls, filename: str) -> "ByteBuffer":
+    def from_file(cls, filename: str) -> ByteBuffer:
         bb = cls()
         bb._load_with_file(filename)
         # Undo the auto-number increment done by __init__
@@ -166,9 +172,11 @@ class ByteBuffer:
         if self._file_buf is None:
             return
         try:
-            from watchdog.observers import Observer
-            from watchdog.events import FileSystemEventHandler
             import time
+
+            from watchdog.events import FileSystemEventHandler
+            from watchdog.observers import Observer
+
             from ..logger import get as _log
 
             directory = os.path.dirname(self._file_buf.filename) or "."
@@ -186,7 +194,7 @@ class ByteBuffer:
             )
 
             class _Handler(FileSystemEventHandler):
-                def __init__(self, bb: "ByteBuffer") -> None:
+                def __init__(self, bb: ByteBuffer) -> None:
                     self._bb = bb
 
                 def on_modified(self, event) -> None:
@@ -359,7 +367,7 @@ class ByteBuffer:
                 raise IndexError(f"ByteBuffer[{index}]")
             return seg.buffer[seg.start + index - mapping]
 
-    def range_to_bytes(self, start: int, end: int) -> Optional[bytes]:
+    def range_to_bytes(self, start: int, end: int) -> bytes | None:
         """Return [start, end] inclusive as a bytes object, or None if empty."""
         length = end - start + 1
         if length <= 0:
@@ -395,8 +403,8 @@ class ByteBuffer:
     # ------------------------------------------------------------------
 
     def begin_save_as(self, filename: str,
-                      progress_cb: Optional[ProgressCallback] = None,
-                      done_cb: Optional[Callable] = None) -> threading.Event:
+                      progress_cb: ProgressCallback | None = None,
+                      done_cb: Callable | None = None) -> threading.Event:
         with self.lock:
             if not self._file_ops_allowed:
                 return threading.Event()
@@ -420,7 +428,7 @@ class ByteBuffer:
                     st = os.statvfs(dest_dir)
                     free = st.f_bavail * st.f_frsize
                     if free < self._size:
-                        raise IOError(f"Not enough free space to save '{filename}'.")
+                        raise OSError(f"Not enough free space to save '{filename}'.")
 
                     # write to file
                     stage = "before_write"
@@ -458,10 +466,8 @@ class ByteBuffer:
                         pass  # nothing was written
                     else:
                         # partial write — delete the partial output
-                        try:
+                        with contextlib.suppress(OSError):
                             os.unlink(filename)
-                        except OSError:
-                            pass
 
                     self.read_allowed = True
                     self.modify_allowed = True
@@ -485,8 +491,8 @@ class ByteBuffer:
     # Async Save (same filename, in-place or via temp file)
     # ------------------------------------------------------------------
 
-    def begin_save(self, progress_cb: Optional[ProgressCallback] = None,
-                   done_cb: Optional[Callable] = None) -> threading.Event:
+    def begin_save(self, progress_cb: ProgressCallback | None = None,
+                   done_cb: Callable | None = None) -> threading.Event:
         if self._file_buf is None:
             return threading.Event()
         filename = self._file_buf.filename
@@ -566,7 +572,7 @@ class ByteBuffer:
 
     def _begin_save_via_temp(self, save_path, tmp_path, progress_cb, done_cb):
         """Write to a temp file, delete original, move temp into place."""
-        event = self.begin_save_as(tmp_path, progress_cb, None)
+        self.begin_save_as(tmp_path, progress_cb, None)
 
         def _after_save_as():
             with self.lock:

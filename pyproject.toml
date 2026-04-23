@@ -8,7 +8,7 @@ version = "0.6.0"
 description = "Python/GObject-Introspection port of Bless — a GTK hex editor"
 readme = "README.md"
 license = {text = "GPL-2.0-or-later"}
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "PyGObject>=3.44",
     "watchdog>=3.0; sys_platform != 'win32'",

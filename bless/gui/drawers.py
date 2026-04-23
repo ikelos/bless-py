@@ -3,16 +3,18 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 from enum import IntEnum
 from typing import Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
-from gi.repository import Gtk, Gdk, Pango, PangoCairo
 import cairo
+from gi.repository import Gdk, Gtk, Pango, PangoCairo
 
 
 class HighlightType(IntEnum):
@@ -65,17 +67,17 @@ class DrawerInfo:
         self.font_language = "en"
         self.uppercase = True   # hex digits always uppercase
 
-        self.fg_normal:    list[list[Optional[Gdk.RGBA]]] = [
+        self.fg_normal:    list[list[Gdk.RGBA | None]] = [
             [_parse_rgba("black"), _parse_rgba("blue")],
             [_parse_rgba("black"), _parse_rgba("blue")],
         ]
-        self.bg_normal:    list[list[Optional[Gdk.RGBA]]] = [
+        self.bg_normal:    list[list[Gdk.RGBA | None]] = [
             [_parse_rgba("white"), _parse_rgba("white")],
             [_parse_rgba("white"), _parse_rgba("white")],
         ]
         ht = int(HighlightType.Sentinel)
-        self.fg_highlight: list[list[Optional[Gdk.RGBA]]] = [[None]*ht for _ in range(2)]
-        self.bg_highlight: list[list[Optional[Gdk.RGBA]]] = [[None]*ht for _ in range(2)]
+        self.fg_highlight: list[list[Gdk.RGBA | None]] = [[None]*ht for _ in range(2)]
+        self.bg_highlight: list[list[Gdk.RGBA | None]] = [[None]*ht for _ in range(2)]
 
     def setup_highlight(self, widget: Gtk.Widget) -> None:
         """Derive selection / pattern-match colours from the GTK theme."""
@@ -135,9 +137,9 @@ class Drawer:
 
         # surfaces[row_type][highlight_type] = cairo.ImageSurface
         ht = int(HighlightType.Sentinel)
-        self._surfaces_normal:    list[list[Optional[cairo.ImageSurface]]] = [[None]*2 for _ in range(2)]
-        self._surfaces_highlight: list[list[Optional[cairo.ImageSurface]]] = [[None]*ht for _ in range(2)]
-        self._back_colors: list[list[Optional[Gdk.RGBA]]] = [[None]*ht for _ in range(2)]
+        self._surfaces_normal:    list[list[cairo.ImageSurface | None]] = [[None]*2 for _ in range(2)]
+        self._surfaces_highlight: list[list[cairo.ImageSurface | None]] = [[None]*ht for _ in range(2)]
+        self._back_colors: list[list[Gdk.RGBA | None]] = [[None]*ht for _ in range(2)]
 
         self._init_surfaces()
         self._init_back_colors()
@@ -264,8 +266,7 @@ class HexDrawer(_MonoDrawer):
     _digits_per_byte = 2
 
     def _glyph_for(self, byte: int) -> str:
-        fmt = "%02X" if self._info.uppercase else "%02x"
-        return fmt % byte
+        return f"{byte:02X}" if self._info.uppercase else f"{byte:02x}"
 
 
 class AsciiDrawer(_MonoDrawer):
@@ -282,14 +283,14 @@ class DecimalDrawer(_MonoDrawer):
     _digits_per_byte = 3
 
     def _glyph_for(self, byte: int) -> str:
-        return "%03d" % byte
+        return f"{byte:03d}"
 
 
 class OctalDrawer(_MonoDrawer):
     _digits_per_byte = 3
 
     def _glyph_for(self, byte: int) -> str:
-        return "%03o" % byte
+        return f"{byte:03o}"
 
 
 class BinaryDrawer(_MonoDrawer):

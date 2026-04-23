@@ -3,6 +3,7 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,7 +14,7 @@ class ListNode:
     """Node of a doubly-linked intrusive list used by SegmentCollection."""
     __slots__ = ("data", "prev", "next")
 
-    def __init__(self, data: "Segment") -> None:
+    def __init__(self, data: Segment) -> None:
         self.data: Segment = data
         self.prev: ListNode | None = None
         self.next: ListNode | None = None
@@ -39,7 +40,7 @@ class LinkedList:
     def count(self) -> int:
         return self._count
 
-    def append(self, seg: "Segment") -> ListNode:
+    def append(self, seg: Segment) -> ListNode:
         node = ListNode(seg)
         if self._last is None:
             self._first = self._last = node
@@ -50,7 +51,7 @@ class LinkedList:
         self._count += 1
         return node
 
-    def insert_after(self, ref: ListNode | None, seg: "Segment") -> ListNode:
+    def insert_after(self, ref: ListNode | None, seg: Segment) -> ListNode:
         node = ListNode(seg)
         if ref is None:
             # insert at head
@@ -71,7 +72,7 @@ class LinkedList:
         self._count += 1
         return node
 
-    def insert_before(self, ref: ListNode | None, seg: "Segment") -> ListNode:
+    def insert_before(self, ref: ListNode | None, seg: Segment) -> ListNode:
         if ref is None:
             return self.append(seg)
         node = ListNode(seg)
@@ -113,7 +114,7 @@ class Segment:
 
     __slots__ = ("buffer", "start", "end")
 
-    def __init__(self, buffer: "IBuffer", start: int, end: int) -> None:
+    def __init__(self, buffer: IBuffer, start: int, end: int) -> None:
         self.buffer = buffer
         self.start = start
         self.end = end
@@ -125,7 +126,7 @@ class Segment:
     def contains(self, offset: int, mapping: int) -> bool:
         return mapping <= offset <= mapping + self.end - self.start
 
-    def split_at(self, pos: int) -> "Segment | None":
+    def split_at(self, pos: int) -> Segment | None:
         """Split this segment at *pos* bytes from its own start.
         Returns the right half (or None if *pos* is 0 or beyond end)."""
         if pos > self.end - self.start or pos == 0:

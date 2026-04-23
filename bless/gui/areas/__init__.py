@@ -1,6 +1,11 @@
-from .area import Area, GetOffsetFlags, register_area, create_area
+from .area import Area, GetOffsetFlags, create_area, register_area
 from .area_group import AreaGroup, Highlight
 from .concrete_areas import (
-    HexArea, AsciiArea, OffsetArea,
-    DecimalArea, OctalArea, BinaryArea, SeparatorArea,
+    AsciiArea,
+    BinaryArea,
+    DecimalArea,
+    HexArea,
+    OctalArea,
+    OffsetArea,
+    SeparatorArea,
 )

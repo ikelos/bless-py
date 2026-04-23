@@ -3,17 +3,19 @@
 # GPL-2.0-or-later
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
 
 import gi
+
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk
+from gi.repository import Gdk, Gtk
 
 if TYPE_CHECKING:
     from .data_view import DataView
 
 
-def _parse_offset(text: str) -> Optional[int]:
+def _parse_offset(text: str) -> int | None:
     """Parse decimal or 0x-prefixed hex offset string."""
     t = text.strip()
     if not t:
@@ -36,7 +38,7 @@ class GotoOffsetBar(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=4,
                          margin_top=2, margin_bottom=2,
                          margin_start=4, margin_end=4)
-        self._dv: Optional["DataView"] = None
+        self._dv: DataView | None = None
 
         self.pack_start(Gtk.Label(label="Go to offset:"), False, False, 0)
 
@@ -64,7 +66,7 @@ class GotoOffsetBar(Gtk.Box):
 
         self.set_no_show_all(True)
 
-    def attach_view(self, dv: "DataView") -> None:
+    def attach_view(self, dv: DataView) -> None:
         self._dv = dv
 
     def show_bar(self) -> None:
