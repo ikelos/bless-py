@@ -141,11 +141,21 @@ class DataViewControl:
             return
         ss, se = self._sel_start, self._sel_end
 
-        # No drag: just position cursor
+        buf = dv.buffer
+
+        # Same anchor and end: select the single byte at that position
         if ss.second == se.second:
-            display.make_offset_visible(ss.second, show_type)
-            dv.set_selection(-1, -1)
-            dv.move_cursor(ss.second, ss.digit)
+            off = ss.second
+            if buf and 0 <= off < buf.size:
+                # Select the single byte under the cursor
+                display.make_offset_visible(off, show_type)
+                dv.set_selection(off, off)
+                dv.move_cursor(off, ss.digit)
+            else:
+                # Past EOF or empty buffer: clear selection, just move cursor
+                display.make_offset_visible(ss.second, show_type)
+                dv.set_selection(-1, -1)
+                dv.move_cursor(ss.second, ss.digit)
             return
 
         # Drag: mark selection between anchor and current
@@ -153,8 +163,6 @@ class DataViewControl:
         b = se.second
         if a > b:
             a, b = b, a
-        # Clamp to valid range
-        buf = dv.buffer
         if buf:
             a = max(0, min(a, buf.size - 1))
             b = max(0, min(b, buf.size - 1))

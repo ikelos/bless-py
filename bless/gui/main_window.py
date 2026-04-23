@@ -318,7 +318,8 @@ class MainWindow(Gtk.ApplicationWindow):
         sel_str = "Selection: None"
         if not sel.is_empty() and sel.start >= 0 and sel.end >= sel.start:
             n = sel.end - sel.start + 1
-            sel_str = f"Selection: 0x{sel.start:x}–0x{sel.end:x} ({n} bytes)"
+            unit = "byte" if n == 1 else "bytes"
+            sel_str = f"Selection: 0x{sel.start:x}–0x{sel.end:x} ({n} {unit})"
 
         self._statusbar.push(
             self._ctx,
