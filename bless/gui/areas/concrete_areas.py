@@ -552,7 +552,15 @@ class SeparatorArea(Area):
                 bg_color = a.drawer.get_background_color(RowType.Even, HighlightType.Normal)
                 break
 
-        # Determine how many rows have visible content
+        # Always fill the ENTIRE column with background so there are no black holes
+        if bg_color:
+            cr.set_source_rgba(bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha)
+        else:
+            cr.set_source_rgb(1.0, 1.0, 1.0)
+        cr.rectangle(self.x, self.y, self.width, self.height)
+        cr.fill()
+
+        # Compute how far down the line should extend
         row_h = 0
         for a in ag.areas:
             if a.drawer and a.drawer.height > 0:
@@ -564,24 +572,20 @@ class SeparatorArea(Area):
 
         buf_size = ag.buffer.size if ag.buffer else 0
         bpr = next((a.bpr for a in ag.areas if a.bpr > 0), 1)
+        nrows = self.height // row_h
 
         if buf_size == 0:
-            content_rows = 1          # one offset row for empty file
+            content_rows = 1
         else:
-            content_rows = (buf_size - ag.offset + bpr - 1) // bpr
-            content_rows += 1         # trailing offset row
+            # Cap visible bytes to what the window can show (matches _render_extra)
+            visible_bytes = min(buf_size - ag.offset, nrows * bpr)
+            visible_bytes = max(visible_bytes, 0)
+            data_rows = (visible_bytes + bpr - 1) // bpr
+            content_rows = data_rows + 1   # +1 trailing offset row
 
         line_bottom = self.y + min(content_rows * row_h, self.height)
 
-        # Fill background ONLY up to line_bottom (no white below last text line)
-        if bg_color:
-            cr.set_source_rgba(bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha)
-        else:
-            cr.set_source_rgb(1.0, 1.0, 1.0)
-        cr.rectangle(self.x, self.y, self.width, line_bottom - self.y)
-        cr.fill()
-
-        # Draw the 1px vertical line down to line_bottom
+        # Draw the 1px vertical line only down to line_bottom
         cr.set_source_rgba(0.35, 0.35, 0.35, 1.0)
         mid = self.x + self.width // 2
         cr.set_line_width(1.0)

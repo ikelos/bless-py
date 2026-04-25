@@ -37,6 +37,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._file_ops  = FileOperations(self._data_book, self)
         self._initial_files = list(files) if files else []
         self._statusbar_radix: int = 16
+        self._syncing_toggles: bool = False
         # These are set in _build_menu_bar; declared here for type checkers
         self._mi_undo: Gtk.MenuItem
         self._mi_redo: Gtk.MenuItem
@@ -254,29 +255,45 @@ class MainWindow(Gtk.ApplicationWindow):
         return tb
 
     def _on_find_toggle(self, btn: Gtk.ToggleToolButton) -> None:
+        if self._syncing_toggles:
+            return
         dv = self._data_book.current_view
         if not dv:
             return
-        if btn.get_active():
-            # Deactivate find-replace toggle
-            self._tb_findreplace.handler_block_by_func(self._on_findreplace_toggle)
-            self._tb_findreplace.set_active(False)
-            self._tb_findreplace.handler_unblock_by_func(self._on_findreplace_toggle)
-            dv.display.show_find()
-        else:
+        find_visible = dv.display.find_bar.get_visible()
+        if find_visible:
             dv.display.find_bar.hide()
+        else:
+            dv.display.show_find()
+        self._sync_find_toolbar(dv)
 
     def _on_findreplace_toggle(self, btn: Gtk.ToggleToolButton) -> None:
+        if self._syncing_toggles:
+            return
         dv = self._data_book.current_view
         if not dv:
             return
-        if btn.get_active():
-            self._tb_find.handler_block_by_func(self._on_find_toggle)
-            self._tb_find.set_active(False)
-            self._tb_find.handler_unblock_by_func(self._on_find_toggle)
-            dv.display.show_find_replace()
-        else:
+        fr_visible = dv.display.find_replace_bar.get_visible()
+        if fr_visible:
             dv.display.find_replace_bar.hide()
+        else:
+            dv.display.show_find_replace()
+        self._sync_find_toolbar(dv)
+
+    def _sync_find_toolbar(self, dv: DataView | None = None) -> None:
+        """Sync toggle button active states to actual bar visibility."""
+        if self._syncing_toggles:
+            return
+        self._syncing_toggles = True
+        try:
+            if dv is None:
+                dv = self._data_book.current_view
+            find_active    = dv is not None and dv.display.find_bar.get_visible()
+            replace_active = dv is not None and dv.display.find_replace_bar.get_visible()
+            self._tb_find.set_active(find_active)
+            self._tb_findreplace.set_active(replace_active)
+        finally:
+            self._syncing_toggles = False
 
     # ------------------------------------------------------------------
     # Actions
@@ -301,11 +318,13 @@ class MainWindow(Gtk.ApplicationWindow):
         dv = self._data_book.current_view
         if dv:
             dv.display.show_find()
+            self._sync_find_toolbar(dv)
 
     def _show_find_replace(self) -> None:
         dv = self._data_book.current_view
         if dv:
             dv.display.show_find_replace()
+            self._sync_find_toolbar(dv)
 
     def _show_goto(self) -> None:
         dv = self._data_book.current_view
@@ -363,26 +382,15 @@ class MainWindow(Gtk.ApplicationWindow):
         # Update menu sensitivity whenever buffer state changes
         dv.connect_buffer_changed(lambda d: self._update_menu_sensitivity(d))
         dv.connect_cursor_changed(lambda d: self._update_menu_sensitivity(d))
-        # Sync toolbar toggle buttons with bar visibility
+        # Sync toolbar toggles when bars are shown/hidden (e.g. via Ctrl+F)
         dv.display.find_bar.connect(
-            "show", lambda *_: self._sync_find_toggles(True, False))
+            "show", lambda *_: self._sync_find_toolbar(dv))
         dv.display.find_bar.connect(
-            "hide", lambda *_: self._sync_find_toggles(False, None))
+            "hide", lambda *_: self._sync_find_toolbar(dv))
         dv.display.find_replace_bar.connect(
-            "show", lambda *_: self._sync_find_toggles(False, True))
+            "show", lambda *_: self._sync_find_toolbar(dv))
         dv.display.find_replace_bar.connect(
-            "hide", lambda *_: self._sync_find_toggles(None, False))
-
-    def _sync_find_toggles(self, find: bool | None, replace: bool | None) -> None:
-        """Sync toolbar toggle state without triggering the toggled signal."""
-        if find is not None:
-            self._tb_find.handler_block_by_func(self._on_find_toggle)
-            self._tb_find.set_active(find)
-            self._tb_find.handler_unblock_by_func(self._on_find_toggle)
-        if replace is not None:
-            self._tb_findreplace.handler_block_by_func(self._on_findreplace_toggle)
-            self._tb_findreplace.set_active(replace)
-            self._tb_findreplace.handler_unblock_by_func(self._on_findreplace_toggle)
+            "hide", lambda *_: self._sync_find_toolbar(dv))
 
     def _on_switch_page(self, nb, widget, n) -> None:
         dv = self._data_book.current_view
@@ -390,8 +398,10 @@ class MainWindow(Gtk.ApplicationWindow):
             self._update_title(dv)
             self._update_statusbar(dv)
             self._update_menu_sensitivity(dv)
+            self._sync_find_toolbar(dv)
         else:
             self._update_menu_sensitivity(None)
+            self._sync_find_toolbar(None)
 
     def _on_dv_buffer_changed(self, dv: DataView) -> None:
         self._update_title(dv)
