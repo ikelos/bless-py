@@ -214,35 +214,38 @@ class Area(ABC):
                                          else HighlightType.Selection)
 
     def _render_cursor(self) -> None:
-        # Draw cursor outline in every focusable area (hex + ascii simultaneously)
+        # Draw cursor in every focusable area simultaneously.
+        # Shape: 2px red underline + 1px red vertical bar on the left of the
+        # active digit/character.  Unfocused areas get a dimmer 1px version.
         if not self._can_focus:
             return
         ag = self.area_group
-        if ag.buffer is None:
+        if ag.buffer is None or self.drawer is None or self._cr is None:
             return
         row, _, cx, cy = self.get_display_info_by_offset(ag.cursor_offset)
-        if self.drawer is None or self._cr is None:
-            return
-        # For the focused area show digit offset; other areas show at byte start
         digit_off = self._cursor_digit if self._cursor_focus else 0
         cx += digit_off * self.drawer.width
         sx = cx + self.x
         sy = cy + self.y
         w  = self.drawer.width
         h  = self.drawer.height
-        # Focused area: bright red; other areas: dimmer indicator
-        if self._cursor_focus:
-            color = self._active_cursor_color
-            lw = 2.0
-        else:
-            color = self._inactive_cursor_color
-            lw = 1.0
-        self._cr.save()
-        self._cr.set_source_rgba(color.red, color.green, color.blue, color.alpha)
-        self._cr.set_line_width(lw)
-        self._cr.rectangle(sx + 1, sy + 1, w - 2, h - 2)
-        self._cr.stroke()
-        self._cr.restore()
+        color = self._active_cursor_color if self._cursor_focus else self._inactive_cursor_color
+        lw_h = 2.0 if self._cursor_focus else 1.0   # underline width
+        lw_v = 1.0                                    # vertical bar always 1px
+        cr = self._cr
+        cr.save()
+        cr.set_source_rgba(color.red, color.green, color.blue, color.alpha)
+        # Underline along the bottom of the character cell
+        cr.set_line_width(lw_h)
+        cr.move_to(sx,     sy + h - lw_h / 2)
+        cr.line_to(sx + w, sy + h - lw_h / 2)
+        cr.stroke()
+        # Thin vertical bar on the left edge of the active digit
+        cr.set_line_width(lw_v)
+        cr.move_to(sx + 0.5, sy)
+        cr.line_to(sx + 0.5, sy + h)
+        cr.stroke()
+        cr.restore()
 
     # ------------------------------------------------------------------
     # Properties

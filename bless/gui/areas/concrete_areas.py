@@ -383,8 +383,10 @@ class OffsetArea(Area):
         nrows = self.height // self.drawer.height
 
         if buf_size == 0:
-            for i in range(nrows):
-                self._render_row_normal(i, 0, 0, True)
+            # Empty file: always show offset 0 on first row
+            self._render_offset_only(0)
+            for i in range(1, nrows):
+                self._render_blank_row(i)
             return
 
         visible_bytes = nrows * self.bpr
@@ -399,14 +401,15 @@ class OffsetArea(Area):
         for i in range(full_rows):
             self._render_row_normal(i, 0, self.bpr, True)
 
-        # The row immediately after the last content row: render its offset
-        # even though it has no bytes (so the user sees where the next byte
-        # would go, matching the original Bless behaviour).
-        if full_rows < nrows:
-            self._render_offset_only(full_rows)
+        # Always show the next offset row after the last content row so the
+        # user sees where the next byte would go.  This also handles the case
+        # where buf_size is exactly divisible by bpr (last row is full).
+        next_row = full_rows
+        if next_row < nrows:
+            self._render_offset_only(next_row)
+            next_row += 1
 
-        # Fill remaining rows with blank background only
-        for i in range(full_rows + 1, nrows):
+        for i in range(next_row, nrows):
             self._render_blank_row(i)
 
     def _render_offset_only(self, row: int) -> None:
@@ -534,31 +537,56 @@ class SeparatorArea(Area):
         self._sep_width = 8   # total pixel width — one full character
 
     def render(self) -> None:
-        """Draw a thin 1-pixel vertical line centred in the separator column."""
+        """Draw a thin 1-pixel vertical line down to the bottom of the last content row."""
         if self._cr is None or self.width <= 0 or self.height <= 0:
             return
+        ag = self.area_group
         cr = self._cr
         cr.save()
-        # Fill background with the hex-area background colour so it's never black
-        ag = self.area_group
+
+        # Resolve background colour from any realized area
         bg_color = None
         for a in ag.areas:
             if a.drawer and hasattr(a.drawer, "get_background_color"):
                 from ..drawers import HighlightType, RowType
                 bg_color = a.drawer.get_background_color(RowType.Even, HighlightType.Normal)
                 break
+
+        # Determine how many rows have visible content
+        row_h = 0
+        for a in ag.areas:
+            if a.drawer and a.drawer.height > 0:
+                row_h = a.drawer.height
+                break
+        if row_h <= 0:
+            cr.restore()
+            return
+
+        buf_size = ag.buffer.size if ag.buffer else 0
+        bpr = next((a.bpr for a in ag.areas if a.bpr > 0), 1)
+
+        if buf_size == 0:
+            content_rows = 1          # one offset row for empty file
+        else:
+            content_rows = (buf_size - ag.offset + bpr - 1) // bpr
+            content_rows += 1         # trailing offset row
+
+        line_bottom = self.y + min(content_rows * row_h, self.height)
+
+        # Fill background ONLY up to line_bottom (no white below last text line)
         if bg_color:
             cr.set_source_rgba(bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha)
         else:
             cr.set_source_rgb(1.0, 1.0, 1.0)
-        cr.rectangle(self.x, self.y, self.width, self.height)
+        cr.rectangle(self.x, self.y, self.width, line_bottom - self.y)
         cr.fill()
-        # Draw a subtle 1px dark-grey vertical line centred in the column
+
+        # Draw the 1px vertical line down to line_bottom
         cr.set_source_rgba(0.35, 0.35, 0.35, 1.0)
         mid = self.x + self.width // 2
         cr.set_line_width(1.0)
         cr.move_to(mid + 0.5, self.y)
-        cr.line_to(mid + 0.5, self.y + self.height)
+        cr.line_to(mid + 0.5, line_bottom)
         cr.stroke()
         cr.restore()
 

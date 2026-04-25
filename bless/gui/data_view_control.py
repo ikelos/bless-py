@@ -52,6 +52,7 @@ class DataViewControl:
         self._sel_end   = _Pos()
         # True while the mouse button is held for a drag-select
         self._mouse_selecting = False
+        self._mouse_dragged   = False  # True once pointer moves after press
 
         self._okp_focus_area: Area | None = None
         self._okp_bpr = 1
@@ -73,6 +74,7 @@ class DataViewControl:
         self._sel_start = _Pos(0, 0, 0)
         self._sel_end   = _Pos(0, 0, 0)
         self._mouse_selecting = False
+        self._mouse_dragged   = False
 
     # ------------------------------------------------------------------
     # Helper: area at (x, y)
@@ -134,39 +136,42 @@ class DataViewControl:
         dv.set_selection(-1, -1)
         dv.move_cursor(pos.second, pos.digit)
 
-    def _evaluate_selection(self, show_type: str = "closest") -> None:
+    def _evaluate_selection(self, show_type: str = "closest",
+                             extend: bool = False) -> None:
+        """Update cursor and selection.
+
+        extend=False  →  plain move: clear selection, place cursor.
+        extend=True   →  Shift or drag: select range between anchor and end.
+                         When anchor==end byte, selects that single byte.
+                         When anchor and end are on different digits of the
+                         same byte (hex), still selects that single byte.
+        """
         dv = self._dv
         display = self._display
         if display is None:
             return
         ss, se = self._sel_start, self._sel_end
-
         buf = dv.buffer
 
-        # Same anchor and end: select the single byte at that position
-        if ss.second == se.second:
+        if not extend:
+            # Plain movement: clear selection, place cursor
             off = ss.second
-            if buf and 0 <= off < buf.size:
-                # Select the single byte under the cursor
-                display.make_offset_visible(off, show_type)
-                dv.set_selection(off, off)
-                dv.move_cursor(off, ss.digit)
-            else:
-                # Past EOF or empty buffer: clear selection, just move cursor
-                display.make_offset_visible(ss.second, show_type)
-                dv.set_selection(-1, -1)
-                dv.move_cursor(ss.second, ss.digit)
+            display.make_offset_visible(off, show_type)
+            dv.set_selection(-1, -1)
+            dv.move_cursor(off, ss.digit)
             return
 
-        # Drag: mark selection between anchor and current
-        a = ss.second
-        b = se.second
+        # Extension / drag: select [min, max] bytes
+        a, b = ss.second, se.second
         if a > b:
             a, b = b, a
         if buf:
             a = max(0, min(a, buf.size - 1))
             b = max(0, min(b, buf.size - 1))
-        if a <= b:
+        # Always select at least the single byte at the cursor
+        if a > b:
+            a = b = se.second
+        if buf and 0 <= a < buf.size:
             dv.set_selection(a, b)
         else:
             dv.set_selection(-1, -1)
@@ -200,14 +205,16 @@ class DataViewControl:
 
         if event.button == 1:
             if event.state & Gdk.ModifierType.SHIFT_MASK:
-                # Extend selection from existing anchor
+                # Extend from existing anchor to clicked byte
                 self._sel_end = pos.copy()
+                self._evaluate_selection("closest", extend=True)
             else:
-                # New click: anchor both start and end at the same point
+                # New anchor: clear selection, move cursor
                 self._sel_start = pos.copy()
                 self._sel_end   = pos.copy()
+                self._mouse_dragged = False
+                self._evaluate_selection("closest", extend=False)
             self._mouse_selecting = True
-            self._evaluate_selection("closest")
 
     def on_motion_notify(self, widget: Gtk.Widget, event: Gdk.EventMotion) -> None:
         if not self._mouse_selecting:
@@ -226,8 +233,9 @@ class DataViewControl:
             return
         pos = self._calc_pos(area, x - area.x, y - area.y)
         self._sel_end = pos.copy()
+        self._mouse_dragged = True
         self._update_focus(area)
-        self._evaluate_selection("closest")
+        self._evaluate_selection("closest", extend=True)
 
     def on_button_release(self, widget: Gtk.Widget, event: Gdk.EventButton) -> None:
         if not self._mouse_selecting:
@@ -236,13 +244,14 @@ class DataViewControl:
         area = self._area_at(int(event.x), int(event.y))
         if area is None:
             return
-        # Clamp y to within the area
         y = int(event.y)
         dh = area.drawer.height if area.drawer else 16
         y = max(area.y, min(y, area.y + area.height - dh))
         pos = self._calc_pos(area, int(event.x - area.x), y - area.y)
         self._sel_end = pos.copy()
-        self._evaluate_selection("closest")
+        # Always extend on release — even a click-and-release on the same byte
+        # clears the anchor, which is fine; extend=True selects if different byte
+        self._evaluate_selection("closest", extend=self._mouse_dragged)
 
     # ------------------------------------------------------------------
     # Keyboard events
@@ -312,7 +321,7 @@ class DataViewControl:
             else:
                 self._sel_start = nxt.copy()
                 self._sel_end   = nxt.copy()
-            self._evaluate_selection(self._okp_show_type)
+            self._evaluate_selection(self._okp_show_type, extend=shift)
             return True
 
         return False
