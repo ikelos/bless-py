@@ -74,12 +74,48 @@ class MainWindow(Gtk.ApplicationWindow):
     # UI construction
     # ------------------------------------------------------------------
 
+    def _build_accelerators(self) -> Gtk.AccelGroup:
+        # Keyboard accelerators
+        accel = Gtk.AccelGroup()
+        self.add_accel_group(accel)
+        accel_map = Gtk.AccelMap
+
+        def _accel(path, key, mods):
+            accel_map.add_entry(path, Gdk.keyval_from_name(key), mods)
+
+        ctrl = Gdk.ModifierType.CONTROL_MASK
+        ctrl_shift = Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK
+
+        # File shortcuts
+        _accel("<Actions>/File/New", "n", ctrl)
+        _accel("<Actions>/File/Open", "o", ctrl)
+        _accel("<Actions>/File/Save", "s", ctrl)
+        _accel("<Actions>/File/SaveAs", "s", ctrl_shift)
+        _accel("<Actions>/File/Close", "w", ctrl)
+        _accel("<Actions>/File/Quit", "q", ctrl)
+
+        # Edit shortcuts
+        _accel("<Actions>/Edit/Undo", "z", ctrl)
+        _accel("<Actions>/Edit/Redo", "z", ctrl_shift)
+        _accel("<Actions>/Edit/SelectAll", "a", ctrl)
+        _accel("<Actions>/Edit/SelectRange", "r", ctrl_shift)
+
+        # Search shortcuts
+        _accel("<Actions>/Search/Find", "f", ctrl)
+        _accel("<Actions>/Search/FindReplace", "r", ctrl)
+        _accel("<Actions>/Search/GotoOffset", "g", ctrl)
+
+        return accel
+
     def _build_ui(self) -> None:
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add(root)
 
+        # Accelerators
+        accel = self._build_accelerators()
+
         # Menu bar
-        menu_bar = self._build_menu_bar()
+        menu_bar = self._build_menu_bar(accel)
         root.pack_start(menu_bar, False, False, 0)
 
         # Toolbar
@@ -97,86 +133,97 @@ class MainWindow(Gtk.ApplicationWindow):
         self._statusbar.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
         self._statusbar.connect("button-press-event", lambda *_: self._cycle_statusbar_radix())
 
-        # Keyboard accelerators
-        accel = Gtk.AccelGroup()
-        self.add_accel_group(accel)
-
-        def _accel(key, mods, fn):
-            accel.connect(Gdk.keyval_from_name(key), mods, Gtk.AccelFlags.VISIBLE, lambda *_: fn())
-
-        ctrl = Gdk.ModifierType.CONTROL_MASK
-        ctrl_shift = Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK
-
-        _accel("z", ctrl, lambda: self._current_dv_call("undo"))
-        _accel("z", ctrl_shift, lambda: self._current_dv_call("redo"))
-        _accel("a", ctrl, self._select_all)
-        _accel("r", ctrl_shift, self._show_select_range)
-
-        # File shortcuts
-        _accel("n", ctrl, lambda: self._file_ops.new_file())
-        _accel("o", ctrl, lambda: self._file_ops.open_file())
-        _accel("s", ctrl, lambda: self._file_ops.save_file())
-        _accel("s", ctrl_shift, lambda: self._file_ops.save_file_as())
-
-    def _build_menu_bar(self) -> Gtk.MenuBar:
+    def _build_menu_bar(self, accel_group: Gtk.AccelGroup) -> Gtk.MenuBar:
         mb = Gtk.MenuBar()
 
-        def _item(label: str, cb) -> Gtk.MenuItem:
+        def _item(label: str, accel_path: str, cb) -> Gtk.MenuItem:
             it = Gtk.MenuItem.new_with_mnemonic(label)
+            it.set_accel_path(accel_path)
             it.connect("activate", cb)
             return it
 
         # --- File ---
         file_menu = Gtk.Menu()
-        file_menu.append(_item("_New              Ctrl+N", lambda *_: self._file_ops.new_file()))
-        file_menu.append(_item("_Open…            Ctrl+O", lambda *_: self._file_ops.open_file()))
-        self._mi_save = _item("_Save             Ctrl+S", lambda *_: self._file_ops.save_file())
-        self._mi_saveas = _item("Save _As…  Shift+Ctrl+S", lambda *_: self._file_ops.save_file_as())
-        self._mi_revert = _item("_Revert", lambda *_: self._file_ops.revert_file())
-        self._mi_close = _item("_Close", lambda *_: self._file_ops.close_file())
+        file_menu.set_accel_group(accel_group)
+        file_menu.append(_item("_New", "<Actions>/File/New", lambda *_: self._file_ops.new_file()))
+        file_menu.append(
+            _item("_Open…", "<Actions>/File/Open", lambda *_: self._file_ops.open_file())
+        )
+        self._mi_save = _item("_Save", "<Actions>/File/Save", lambda *_: self._file_ops.save_file())
+        self._mi_saveas = _item(
+            "Save _As…", "<Actions>/File/SaveAs", lambda *_: self._file_ops.save_file_as()
+        )
+        self._mi_revert = _item(
+            "_Revert", "<Actions>/File/Revert", lambda *_: self._file_ops.revert_file()
+        )
+        self._mi_close = _item(
+            "_Close", "<Actions>/File/Close", lambda *_: self._file_ops.close_file()
+        )
         for it in (self._mi_save, self._mi_saveas, self._mi_revert):
             file_menu.append(it)
         file_menu.append(Gtk.SeparatorMenuItem())
         file_menu.append(self._mi_close)
-        file_menu.append(_item("_Quit", lambda *_: self.get_application().quit()))
+        file_menu.append(
+            _item("_Quit", "<Actions>/File/Quit", lambda *_: self.get_application().quit())
+        )
         fi = Gtk.MenuItem.new_with_mnemonic("_File")
         fi.set_submenu(file_menu)
         mb.append(fi)
 
         # --- Edit ---
         edit_menu = Gtk.Menu()
-        self._mi_undo = _item("_Undo         Ctrl+Z", lambda *_: self._current_dv_call("undo"))
-        self._mi_redo = _item("_Redo  Shift+Ctrl+Z", lambda *_: self._current_dv_call("redo"))
+        edit_menu.set_accel_group(accel_group)
+        self._mi_undo = _item(
+            "_Undo", "<Actions>/Edit/Undo", lambda *_: self._current_dv_call("undo")
+        )
+        self._mi_redo = _item(
+            "_Redo", "<Actions>/Edit/Redo", lambda *_: self._current_dv_call("redo")
+        )
         edit_menu.append(self._mi_undo)
         edit_menu.append(self._mi_redo)
         edit_menu.append(Gtk.SeparatorMenuItem())
-        for label, cb in (
-            ("Cu_t", lambda *_: self._current_dv_call("cut")),
-            ("_Copy", lambda *_: self._current_dv_call("copy")),
-            ("_Paste", lambda *_: self._current_dv_call("paste")),
-            ("_Delete", lambda *_: self._current_dv_call("delete")),
+        for label, accel, cb in (
+            ("Cu_t", "<Actions>/Edit/Cut", lambda *_: self._current_dv_call("cut")),
+            ("_Copy", "<Actions>/Edit/Copy", lambda *_: self._current_dv_call("copy")),
+            ("_Paste", "<Actions>/Edit/Paste", lambda *_: self._current_dv_call("paste")),
+            ("_Delete", "<Actions>/Edit/Delete", lambda *_: self._current_dv_call("delete")),
         ):
-            edit_menu.append(_item(label, cb))
+            edit_menu.append(_item(label, accel, cb))
         edit_menu.append(Gtk.SeparatorMenuItem())
-        edit_menu.append(_item("Select _All         Ctrl+A", lambda *_: self._select_all()))
-        edit_menu.append(_item("Select _Range  Shift+Ctrl+R", lambda *_: self._show_select_range()))
+        edit_menu.append(
+            _item("Select _All", "<Actions>/Edit/SelectAll", lambda *_: self._select_all())
+        )
+        edit_menu.append(
+            _item(
+                "Select _Range", "<Actions>/Edit/SelectRange", lambda *_: self._show_select_range()
+            )
+        )
         ei = Gtk.MenuItem.new_with_mnemonic("_Edit")
         ei.set_submenu(edit_menu)
         mb.append(ei)
 
         # --- Search ---
         search_menu = Gtk.Menu()
-        search_menu.append(_item("_Find…            Ctrl+F", lambda *_: self._show_find()))
-        search_menu.append(_item("Find & _Replace…  Ctrl+H", lambda *_: self._show_find_replace()))
+        search_menu.set_accel_group(accel_group)
+        search_menu.append(_item("_Find…", "<Actions>/Search/Find", lambda *_: self._show_find()))
+        search_menu.append(
+            _item(
+                "Find & _Replace…",
+                "<Actions>/Search/FindReplace",
+                lambda *_: self._show_find_replace(),
+            )
+        )
         search_menu.append(Gtk.SeparatorMenuItem())
-        search_menu.append(_item("_Go to Offset…    Ctrl+G", lambda *_: self._show_goto()))
+        search_menu.append(
+            _item("_Go to Offset…", "<Actions>/Search/GotoOffset", lambda *_: self._show_goto())
+        )
         si = Gtk.MenuItem.new_with_mnemonic("_Search")
         si.set_submenu(search_menu)
         mb.append(si)
 
         # --- Help ---
         help_menu = Gtk.Menu()
-        help_menu.append(_item("_About", lambda *_: self._show_about()))
+        help_menu.append(_item("_About", "<Actions>/Help/About", lambda *_: self._show_about()))
         hi = Gtk.MenuItem.new_with_mnemonic("_Help")
         hi.set_submenu(help_menu)
         mb.append(hi)

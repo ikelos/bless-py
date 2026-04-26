@@ -512,7 +512,7 @@ class ByteBuffer:
             if self._watcher:
                 self._watcher.stop()
 
-            save_path = self._file_buf.filename
+            save_path = self.filename
             seg_col_snapshot = self._seg_col  # keep reference before close
 
             def _thread():
@@ -599,7 +599,7 @@ class ByteBuffer:
         if self._file_buf is not None:
             self._file_buf.close()
         self._teardown_watcher()
-        self._seg_col = None
+        self._seg_col = SegmentCollection()
 
     # ------------------------------------------------------------------
     # Make private copies of undo/redo (for safe saving)

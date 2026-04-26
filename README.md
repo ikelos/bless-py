@@ -66,7 +66,7 @@ bless/
 pip install PyGObject watchdog
 
 # Run directly
-python -m bless.main [file ...]
+python -m bless [file ...]
 
 # Or after pip install -e .
 bless [file ...]
