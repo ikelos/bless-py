@@ -30,9 +30,9 @@ class DataBook(Gtk.Notebook):
 
         self._views: list[DataView] = []
 
-        self._page_added_handlers:   list[DataViewHandler] = []
+        self._page_added_handlers: list[DataViewHandler] = []
         self._page_removed_handlers: list[Callable] = []
-        self._switch_handlers:       list[Callable] = []
+        self._switch_handlers: list[Callable] = []
 
         self.connect("switch-page", self._on_switch_page)
 
@@ -64,8 +64,7 @@ class DataBook(Gtk.Notebook):
 
         close_btn = Gtk.Button()
         close_btn.set_relief(Gtk.ReliefStyle.NONE)
-        img = Gtk.Image.new_from_icon_name("window-close-symbolic",
-                                           Gtk.IconSize.MENU)
+        img = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU)
         close_btn.add(img)
         close_btn.connect("clicked", lambda b: self.close_page(dv))
         label_box.pack_start(close_btn, False, False, 0)
@@ -138,9 +137,11 @@ class DataBook(Gtk.Notebook):
         if tab_label and isinstance(tab_label, Gtk.Box):
             for child in tab_label.get_children():
                 if isinstance(child, Gtk.Label):
-                    markup = (f'<span foreground="red">'
-                              f'{child.get_text()}</span>'
-                              if dv.notification else child.get_text())
+                    markup = (
+                        f'<span foreground="red">{child.get_text()}</span>'
+                        if dv.notification
+                        else child.get_text()
+                    )
                     child.set_markup(markup)
                     break
 

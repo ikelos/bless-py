@@ -114,10 +114,10 @@ class ByteBuffer:
     def _emit_file_changed(self) -> None:
         if self._emit_events:
             from ..logger import get as _log
+
             _log().debug(
-                "_emit_file_changed fired for %r  "
-                "num_handlers=%d",
-                getattr(self._file_buf, 'filename', '?'),
+                "_emit_file_changed fired for %r  num_handlers=%d",
+                getattr(self._file_buf, "filename", "?"),
                 len(self._file_changed_handlers),
             )
             for h in list(self._file_changed_handlers):
@@ -169,15 +169,13 @@ class ByteBuffer:
         if self._file_buf is None:
             return
         try:
-            import time
-
             from watchdog.events import FileSystemEventHandler
             from watchdog.observers import Observer
 
             from ..logger import get as _log
 
             directory = os.path.dirname(self._file_buf.filename) or "."
-            fname     = os.path.basename(self._file_buf.filename)
+            fname = os.path.basename(self._file_buf.filename)
 
             # Record mtime at open time; only fire if mtime actually advances
             try:
@@ -187,7 +185,8 @@ class ByteBuffer:
 
             _log().debug(
                 "Watcher started for %r  mtime_at_open=%.6f",
-                self._file_buf.filename, self._watch_mtime,
+                self._file_buf.filename,
+                self._watch_mtime,
             )
 
             class _Handler(FileSystemEventHandler):
@@ -204,7 +203,8 @@ class ByteBuffer:
                     except OSError as exc:
                         _log().debug(
                             "Watcher on_modified: stat failed for %r  exc=%s",
-                            event.src_path, exc,
+                            event.src_path,
+                            exc,
                         )
                         return
                     _log().debug(
@@ -310,14 +310,13 @@ class ByteBuffer:
                 self._redo_deque.clear()
             self._emit_changed()
 
-    def replace(self, pos1: int, pos2: int, data: bytes,
-                index: int = 0, length: int = -1) -> None:
+    def replace(self, pos1: int, pos2: int, data: bytes, index: int = 0, length: int = -1) -> None:
         if length == -1:
             length = len(data)
         with self.lock:
             if not self._modify_allowed:
                 return
-            equal_length = (pos2 - pos1 + 1 == length)
+            equal_length = pos2 - pos1 + 1 == length
             if not self.is_resizable and not equal_length:
                 return
             ra = ReplaceAction(pos1, pos2, data, index, length, self)
@@ -399,9 +398,12 @@ class ByteBuffer:
     # Async Save As
     # ------------------------------------------------------------------
 
-    def begin_save_as(self, filename: str,
-                      progress_cb: ProgressCallback | None = None,
-                      done_cb: Callable | None = None) -> threading.Event:
+    def begin_save_as(
+        self,
+        filename: str,
+        progress_cb: ProgressCallback | None = None,
+        done_cb: Callable | None = None,
+    ) -> threading.Event:
         with self.lock:
             if not self._file_ops_allowed:
                 return threading.Event()
@@ -442,9 +444,7 @@ class ByteBuffer:
                                 fp.write(buf[:chunk])
                                 done += chunk
                                 if progress_cb:
-                                    cancelled = progress_cb(
-                                        done / max(self._size, 1), "update"
-                                    )
+                                    cancelled = progress_cb(done / max(self._size, 1), "update")
                             node = node.next
                 except Exception as e:
                     exc = e
@@ -455,9 +455,7 @@ class ByteBuffer:
                         self._make_private_copy_of_undo_redo()
                         self._close_file_internal()
                         self._load_with_file(filename)
-                        self._save_checkpoint = (
-                            self._undo_deque[0] if self._undo_deque else None
-                        )
+                        self._save_checkpoint = self._undo_deque[0] if self._undo_deque else None
                         self._changed_beyond_undo = False
                     elif stage == "before_create" and exc:
                         pass  # nothing was written
@@ -488,8 +486,9 @@ class ByteBuffer:
     # Async Save (same filename, in-place or via temp file)
     # ------------------------------------------------------------------
 
-    def begin_save(self, progress_cb: ProgressCallback | None = None,
-                   done_cb: Callable | None = None) -> threading.Event:
+    def begin_save(
+        self, progress_cb: ProgressCallback | None = None, done_cb: Callable | None = None
+    ) -> threading.Event:
         if self._file_buf is None:
             return threading.Event()
         filename = self._file_buf.filename
@@ -543,9 +542,7 @@ class ByteBuffer:
                 with self.lock:
                     if exc is None:
                         self._load_with_file(save_path)
-                        self._save_checkpoint = (
-                            self._undo_deque[0] if self._undo_deque else None
-                        )
+                        self._save_checkpoint = self._undo_deque[0] if self._undo_deque else None
                         self._changed_beyond_undo = False
 
                     self.read_allowed = True
@@ -578,9 +575,7 @@ class ByteBuffer:
                 os.rename(tmp_path, save_path)
                 # reload from final location
                 self._load_with_file(save_path)
-                self._save_checkpoint = (
-                    self._undo_deque[0] if self._undo_deque else None
-                )
+                self._save_checkpoint = self._undo_deque[0] if self._undo_deque else None
                 self._changed_beyond_undo = False
                 self._emit_changed()
                 if done_cb:
@@ -612,6 +607,7 @@ class ByteBuffer:
 
     def _make_private_copy_of_undo_redo(self) -> None:
         from ..tools.preferences import Preferences
+
         keep = Preferences.instance().get("Undo.KeepAfterSave", "Always")
 
         if keep == "Never":
@@ -643,9 +639,7 @@ class ByteBuffer:
     @property
     def has_changed(self) -> bool:
         if self._undo_deque:
-            return self._changed_beyond_undo or (
-                self._save_checkpoint is not self._undo_deque[0]
-            )
+            return self._changed_beyond_undo or (self._save_checkpoint is not self._undo_deque[0])
         return self._changed_beyond_undo or self._save_checkpoint is not None
 
     @property

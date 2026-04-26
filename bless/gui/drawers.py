@@ -17,21 +17,21 @@ from gi.repository import Gdk, Gtk, Pango, PangoCairo
 
 
 class HighlightType(IntEnum):
-    Normal       = 0
-    Bookmark     = 1
+    Normal = 0
+    Bookmark = 1
     PatternMatch = 2
-    Selection    = 3
-    Sentinel     = 4
+    Selection = 3
+    Sentinel = 4
 
 
 class RowType(IntEnum):
     Even = 0
-    Odd  = 1
+    Odd = 1
 
 
 class ColumnType(IntEnum):
     Even = 0
-    Odd  = 1
+    Odd = 1
 
 
 def _parse_rgba(name: str) -> Gdk.RGBA:
@@ -42,19 +42,19 @@ def _parse_rgba(name: str) -> Gdk.RGBA:
 
 def _lighter(c: Gdk.RGBA, factor: float) -> Gdk.RGBA:
     return Gdk.RGBA(
-        red   = c.red   + (1.0 - c.red)   * factor,
-        green = c.green + (1.0 - c.green) * factor,
-        blue  = c.blue  + (1.0 - c.blue)  * factor,
-        alpha = c.alpha,
+        red=c.red + (1.0 - c.red) * factor,
+        green=c.green + (1.0 - c.green) * factor,
+        blue=c.blue + (1.0 - c.blue) * factor,
+        alpha=c.alpha,
     )
 
 
 def _darker(c: Gdk.RGBA, factor: float) -> Gdk.RGBA:
     return Gdk.RGBA(
-        red   = c.red   * factor,
-        green = c.green * factor,
-        blue  = c.blue  * factor,
-        alpha = c.alpha,
+        red=c.red * factor,
+        green=c.green * factor,
+        blue=c.blue * factor,
+        alpha=c.alpha,
     )
 
 
@@ -64,19 +64,19 @@ class DrawerInfo:
     def __init__(self) -> None:
         self.font_name = "Courier 12"
         self.font_language = "en"
-        self.uppercase = True   # hex digits always uppercase
+        self.uppercase = True  # hex digits always uppercase
 
-        self.fg_normal:    list[list[Gdk.RGBA | None]] = [
+        self.fg_normal: list[list[Gdk.RGBA | None]] = [
             [_parse_rgba("black"), _parse_rgba("blue")],
             [_parse_rgba("black"), _parse_rgba("blue")],
         ]
-        self.bg_normal:    list[list[Gdk.RGBA | None]] = [
+        self.bg_normal: list[list[Gdk.RGBA | None]] = [
             [_parse_rgba("white"), _parse_rgba("white")],
             [_parse_rgba("white"), _parse_rgba("white")],
         ]
         ht = int(HighlightType.Sentinel)
-        self.fg_highlight: list[list[Gdk.RGBA | None]] = [[None]*ht for _ in range(2)]
-        self.bg_highlight: list[list[Gdk.RGBA | None]] = [[None]*ht for _ in range(2)]
+        self.fg_highlight: list[list[Gdk.RGBA | None]] = [[None] * ht for _ in range(2)]
+        self.bg_highlight: list[list[Gdk.RGBA | None]] = [[None] * ht for _ in range(2)]
 
     def setup_highlight(self, widget: Gtk.Widget) -> None:
         """Derive selection / pattern-match colours from the GTK theme."""
@@ -136,9 +136,13 @@ class Drawer:
 
         # surfaces[row_type][highlight_type] = cairo.ImageSurface
         ht = int(HighlightType.Sentinel)
-        self._surfaces_normal:    list[list[cairo.ImageSurface | None]] = [[None]*2 for _ in range(2)]
-        self._surfaces_highlight: list[list[cairo.ImageSurface | None]] = [[None]*ht for _ in range(2)]
-        self._back_colors: list[list[Gdk.RGBA | None]] = [[None]*ht for _ in range(2)]
+        self._surfaces_normal: list[list[cairo.ImageSurface | None]] = [
+            [None] * 2 for _ in range(2)
+        ]
+        self._surfaces_highlight: list[list[cairo.ImageSurface | None]] = [
+            [None] * ht for _ in range(2)
+        ]
+        self._back_colors: list[list[Gdk.RGBA | None]] = [[None] * ht for _ in range(2)]
 
         self._init_surfaces()
         self._init_back_colors()
@@ -181,38 +185,43 @@ class Drawer:
     # Drawing helpers
     # ------------------------------------------------------------------
 
-    def _blit(self, cr: cairo.Context,
-              src: cairo.ImageSurface,
-              src_x: int, src_y: int,
-              dst_x: int, dst_y: int,
-              w: int, h: int) -> None:
+    def _blit(
+        self,
+        cr: cairo.Context,
+        src: cairo.ImageSurface,
+        src_x: int,
+        src_y: int,
+        dst_x: int,
+        dst_y: int,
+        w: int,
+        h: int,
+    ) -> None:
         cr.set_source_surface(src, dst_x - src_x, dst_y - src_y)
         cr.rectangle(dst_x, dst_y, w, h)
         cr.fill()
 
-    def _fill_rect(self, cr: cairo.Context, color: Gdk.RGBA,
-                   x: int, y: int, w: int, h: int) -> None:
+    def _fill_rect(
+        self, cr: cairo.Context, color: Gdk.RGBA, x: int, y: int, w: int, h: int
+    ) -> None:
         cr.set_source_rgba(color.red, color.green, color.blue, color.alpha)
         cr.rectangle(x, y, w, h)
         cr.fill()
 
-    def draw_normal(self, cr: cairo.Context,
-                    x: int, y: int, byte: int,
-                    row: RowType, col: ColumnType) -> None:
+    def draw_normal(
+        self, cr: cairo.Context, x: int, y: int, byte: int, row: RowType, col: ColumnType
+    ) -> None:
         surf = self._surfaces_normal[int(row)][int(col)]
         if surf:
             self._draw(cr, x, y, byte, surf)
 
-    def draw_highlight(self, cr: cairo.Context,
-                       x: int, y: int, byte: int,
-                       row: RowType, ht: HighlightType) -> None:
+    def draw_highlight(
+        self, cr: cairo.Context, x: int, y: int, byte: int, row: RowType, ht: HighlightType
+    ) -> None:
         surf = self._surfaces_highlight[int(row)][int(ht)]
         if surf:
             self._draw(cr, x, y, byte, surf)
 
-    def _draw(self, cr: cairo.Context,
-              x: int, y: int, byte: int,
-              surf: cairo.ImageSurface) -> None:
+    def _draw(self, cr: cairo.Context, x: int, y: int, byte: int, surf: cairo.ImageSurface) -> None:
         """Blit a single glyph (byte value) from the pre-rendered strip."""
         raise NotImplementedError
 
@@ -232,6 +241,7 @@ class Drawer:
 # ---------------------------------------------------------------------------
 # Concrete drawers
 # ---------------------------------------------------------------------------
+
 
 class _MonoDrawer(Drawer):
     """Helper for drawers whose glyph strip has one character per byte."""
@@ -254,8 +264,7 @@ class _MonoDrawer(Drawer):
             PangoCairo.show_layout(cr, self._layout)
         return surf
 
-    def _draw(self, cr: cairo.Context, x: int, y: int,
-              byte: int, surf: cairo.ImageSurface) -> None:
+    def _draw(self, cr: cairo.Context, x: int, y: int, byte: int, surf: cairo.ImageSurface) -> None:
         dpb = self._digits_per_byte
         w = dpb * self._char_w
         self._blit(cr, surf, byte * w, 0, x, y, w, self._char_h)
@@ -301,4 +310,4 @@ class BinaryDrawer(_MonoDrawer):
 
 class OffsetHexDrawer(HexDrawer):
     """Re-use HexDrawer for offset column rendering."""
-    pass
+

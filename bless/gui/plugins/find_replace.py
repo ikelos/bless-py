@@ -29,24 +29,30 @@ class FindReplaceDialog(Gtk.Dialog):
 
     _BASE_MAP = {
         "Hexadecimal": 16,
-        "Decimal":     10,
-        "Octal":       8,
-        "Binary":      2,
-        "ASCII":       None,  # raw bytes
+        "Decimal": 10,
+        "Octal": 8,
+        "Binary": 2,
+        "ASCII": None,  # raw bytes
     }
 
     def __init__(self, data_book: DataBook, parent: Gtk.Window) -> None:
-        super().__init__(title="Find & Replace", parent=parent,
-                         flags=Gtk.DialogFlags.DESTROY_WITH_PARENT)
-        self._book    = data_book
+        super().__init__(
+            title="Find & Replace", parent=parent, flags=Gtk.DialogFlags.DESTROY_WITH_PARENT
+        )
+        self._book = data_book
         self._op: FindOperation | None = None
 
         self.set_resizable(True)
         self.set_default_size(480, -1)
 
-        grid = Gtk.Grid(column_spacing=8, row_spacing=6,
-                        margin_top=12, margin_bottom=4,
-                        margin_start=12, margin_end=12)
+        grid = Gtk.Grid(
+            column_spacing=8,
+            row_spacing=6,
+            margin_top=12,
+            margin_bottom=4,
+            margin_start=12,
+            margin_end=12,
+        )
         self.get_content_area().pack_start(grid, True, True, 0)
 
         # Find row
@@ -80,26 +86,31 @@ class FindReplaceDialog(Gtk.Dialog):
         grid.attach(self._status_label, 0, 3, 3, 1)
 
         # Buttons
-        btn_box = Gtk.ButtonBox(orientation=Gtk.Orientation.HORIZONTAL,
-                                layout_style=Gtk.ButtonBoxStyle.END,
-                                spacing=6)
+        btn_box = Gtk.ButtonBox(
+            orientation=Gtk.Orientation.HORIZONTAL, layout_style=Gtk.ButtonBoxStyle.END, spacing=6
+        )
 
-        self._btn_prev    = Gtk.Button(label="← Previous")
-        self._btn_next    = Gtk.Button(label="Next →")
+        self._btn_prev = Gtk.Button(label="← Previous")
+        self._btn_next = Gtk.Button(label="Next →")
         self._btn_replace = Gtk.Button(label="Replace")
-        self._btn_all     = Gtk.Button(label="Replace All")
-        self._btn_cancel  = Gtk.Button(label="Cancel")
+        self._btn_all = Gtk.Button(label="Replace All")
+        self._btn_cancel = Gtk.Button(label="Cancel")
 
-        for b in (self._btn_prev, self._btn_next,
-                  self._btn_replace, self._btn_all, self._btn_cancel):
+        for b in (
+            self._btn_prev,
+            self._btn_next,
+            self._btn_replace,
+            self._btn_all,
+            self._btn_cancel,
+        ):
             btn_box.pack_start(b, False, False, 0)
 
         grid.attach(btn_box, 0, 4, 3, 1)
 
-        self._btn_prev.connect("clicked",   lambda b: self._search(forward=False))
-        self._btn_next.connect("clicked",   lambda b: self._search(forward=True))
-        self._btn_replace.connect("clicked",lambda b: self._replace_one())
-        self._btn_all.connect("clicked",    lambda b: self._replace_all())
+        self._btn_prev.connect("clicked", lambda b: self._search(forward=False))
+        self._btn_next.connect("clicked", lambda b: self._search(forward=True))
+        self._btn_replace.connect("clicked", lambda b: self._replace_one())
+        self._btn_all.connect("clicked", lambda b: self._replace_all())
         self._btn_cancel.connect("clicked", lambda b: self.hide())
 
         self.connect("delete-event", lambda w, e: (w.hide(), True)[-1])
@@ -147,9 +158,8 @@ class FindReplaceDialog(Gtk.Dialog):
 
         strategy = self._make_strategy()
         strategy.pattern = data
-        strategy.buffer  = dv.buffer
-        strategy.position = (dv.cursor_offset if forward
-                             else dv.cursor_offset)
+        strategy.buffer = dv.buffer
+        strategy.position = dv.cursor_offset if forward else dv.cursor_offset
 
         self._btn_next.set_sensitive(False)
         self._btn_prev.set_sensitive(False)
@@ -162,11 +172,11 @@ class FindReplaceDialog(Gtk.Dialog):
                     dv.set_selection(op.match.start, op.match.end)
                     dv.move_cursor(op.match.end + 1, 0)
                     dv.display.make_offset_visible(op.match.start, "start")
-                    self._set_status(
-                        f"Found at offset 0x{op.match.start:X}.")
+                    self._set_status(f"Found at offset 0x{op.match.start:X}.")
                 else:
                     self._set_status("Pattern not found.", error=True)
                 return False
+
             GLib.idle_add(_idle)
 
         self._op = FindOperation(strategy, forward=forward, done_cb=_done)
@@ -203,8 +213,8 @@ class FindReplaceDialog(Gtk.Dialog):
             return
 
         strategy = self._make_strategy()
-        strategy.pattern  = find_data
-        strategy.buffer   = dv.buffer
+        strategy.pattern = find_data
+        strategy.buffer = dv.buffer
         strategy.position = 0
 
         count = 0

@@ -14,6 +14,7 @@ from .range import Range
 _RED = True
 _BLACK = False
 
+
 class _Node[T]:
     __slots__ = ("key", "values", "max_end", "left", "right", "red")
 
@@ -159,8 +160,7 @@ class IntervalTree[T]:
     # Delete (simplified: remove one item from node's values list)
     # ------------------------------------------------------------------
 
-    def _delete_item(self, h: _Node[T] | None, key: int,
-                     val: T) -> tuple[_Node[T] | None, bool]:
+    def _delete_item(self, h: _Node[T] | None, key: int, val: T) -> tuple[_Node[T] | None, bool]:
         """Return (new_root, deleted)."""
         if h is None:
             return None, False

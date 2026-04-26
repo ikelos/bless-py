@@ -17,6 +17,7 @@ ProgressCallback = Callable[[object, str], bool]
 # Strategy interface
 # ---------------------------------------------------------------------------
 
+
 class IFindStrategy:
     @property
     def pattern(self) -> bytes: ...
@@ -45,6 +46,7 @@ class IFindStrategy:
 # ---------------------------------------------------------------------------
 # Boyer-Moore (bad-character only) strategy
 # ---------------------------------------------------------------------------
+
 
 class BMFindStrategy(IFindStrategy):
     """
@@ -202,8 +204,8 @@ class BMFindStrategy(IFindStrategy):
 # Simple (brute-force) strategy
 # ---------------------------------------------------------------------------
 
-class SimpleFindStrategy(IFindStrategy):
 
+class SimpleFindStrategy(IFindStrategy):
     def __init__(self) -> None:
         self._pattern = b""
         self._buffer: ByteBuffer | None = None
@@ -289,16 +291,20 @@ class SimpleFindStrategy(IFindStrategy):
 # Async find operation
 # ---------------------------------------------------------------------------
 
+
 class FindOperation:
     """
     Run a find-next or find-previous in a background thread.
     Call ``start()`` and then ``wait()`` or register ``on_done``.
     """
 
-    def __init__(self, strategy: IFindStrategy,
-                 forward: bool = True,
-                 progress_cb: ProgressCallback | None = None,
-                 done_cb: Callable | None = None) -> None:
+    def __init__(
+        self,
+        strategy: IFindStrategy,
+        forward: bool = True,
+        progress_cb: ProgressCallback | None = None,
+        done_cb: Callable | None = None,
+    ) -> None:
         self._strategy = strategy
         self._forward = forward
         self._progress_cb = progress_cb

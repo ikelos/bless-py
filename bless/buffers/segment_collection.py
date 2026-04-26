@@ -75,9 +75,7 @@ class SegmentCollection:
     # Segment lookup
     # ------------------------------------------------------------------
 
-    def find_segment(
-        self, offset: int
-    ) -> tuple[Segment | None, int, ListNode | None]:
+    def find_segment(self, offset: int) -> tuple[Segment | None, int, ListNode | None]:
         """
         Find the segment that contains *offset*.
 
@@ -157,9 +155,7 @@ class SegmentCollection:
     # Delete
     # ------------------------------------------------------------------
 
-    def delete_range(
-        self, pos1: int, pos2: int
-    ) -> SegmentCollection | None:
+    def delete_range(self, pos1: int, pos2: int) -> SegmentCollection | None:
         """
         Remove bytes [pos1, pos2] inclusive from the collection.
 

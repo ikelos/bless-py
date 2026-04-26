@@ -26,7 +26,7 @@ class FileOperations:
     """
 
     def __init__(self, data_book: DataBook, parent: Gtk.Window) -> None:
-        self._book  = data_book
+        self._book = data_book
         self._parent = parent
 
     # ------------------------------------------------------------------
@@ -52,8 +52,7 @@ class FileOperations:
         # Check if already open
         for dv in self._book.views:
             if dv.buffer and dv.buffer.has_file and dv.buffer.filename == filename:
-                self._book.set_current_page(
-                    self._book.page_num(dv.display))
+                self._book.set_current_page(self._book.page_num(dv.display))
                 return dv
 
         try:
@@ -74,8 +73,10 @@ class FileOperations:
             action=Gtk.FileChooserAction.OPEN,
         )
         dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN,   Gtk.ResponseType.OK,
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN,
+            Gtk.ResponseType.OK,
         )
         filename = None
         if dialog.run() == Gtk.ResponseType.OK:
@@ -134,8 +135,10 @@ class FileOperations:
             action=Gtk.FileChooserAction.SAVE,
         )
         dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_SAVE,   Gtk.ResponseType.OK,
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE,
+            Gtk.ResponseType.OK,
         )
         dialog.set_do_overwrite_confirmation(True)
         filename = None
@@ -163,8 +166,7 @@ class FileOperations:
             buttons=Gtk.ButtonsType.YES_NO,
             text=f"Revert '{os.path.basename(dv.buffer.filename)}'?",
         )
-        md.format_secondary_text(
-            "All unsaved changes will be permanently lost.")
+        md.format_secondary_text("All unsaved changes will be permanently lost.")
         if md.run() == Gtk.ResponseType.YES:
             dv.revert()
         md.destroy()
@@ -181,8 +183,7 @@ class FileOperations:
             return True
 
         if dv.buffer and dv.buffer.has_changed:
-            name = (os.path.basename(dv.buffer.filename)
-                    if dv.buffer.has_file else "Untitled")
+            name = os.path.basename(dv.buffer.filename) if dv.buffer.has_file else "Untitled"
             md = Gtk.MessageDialog(
                 parent=self._parent,
                 flags=Gtk.DialogFlags.MODAL,
@@ -190,9 +191,12 @@ class FileOperations:
                 text=f"Save changes to '{name}' before closing?",
             )
             md.add_buttons(
-                "Close without saving", Gtk.ResponseType.NO,
-                Gtk.STOCK_CANCEL,       Gtk.ResponseType.CANCEL,
-                Gtk.STOCK_SAVE,         Gtk.ResponseType.YES,
+                "Close without saving",
+                Gtk.ResponseType.NO,
+                Gtk.STOCK_CANCEL,
+                Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_SAVE,
+                Gtk.ResponseType.YES,
             )
             resp = md.run()
             md.destroy()

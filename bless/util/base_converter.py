@@ -68,7 +68,7 @@ def parse(s: str) -> int:
     t = s.strip()
     if not t:
         raise ValueError("Empty string.")
-    if t.startswith("0x") or t.startswith("0X"):
+    if t.startswith(("0x", "0X")):
         return convert_to_num(t, 16, 2)
     if t.startswith("0") and len(t) > 1:
         return convert_to_num(t, 8)

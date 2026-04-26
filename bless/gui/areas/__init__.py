@@ -9,3 +9,19 @@ from .concrete_areas import (
     OffsetArea,
     SeparatorArea,
 )
+
+__all__ = [
+    "Area",
+    "GetOffsetFlags",
+    "create_area",
+    "register_area",
+    "AreaGroup",
+    "Highlight",
+    "AsciiArea",
+    "BinaryArea",
+    "DecimalArea",
+    "HexArea",
+    "OctalArea",
+    "OffsetArea",
+    "SeparatorArea",
+]

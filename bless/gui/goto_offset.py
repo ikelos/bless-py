@@ -21,7 +21,7 @@ def _parse_offset(text: str) -> int | None:
     if not t:
         return None
     try:
-        if t.startswith("0x") or t.startswith("0X"):
+        if t.startswith(("0x", "0X")):
             return int(t, 16)
         return int(t, 10)
     except ValueError:
@@ -35,9 +35,14 @@ class GotoOffsetBar(Gtk.Box):
     """
 
     def __init__(self) -> None:
-        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=4,
-                         margin_top=2, margin_bottom=2,
-                         margin_start=4, margin_end=4)
+        super().__init__(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            spacing=4,
+            margin_top=2,
+            margin_bottom=2,
+            margin_start=4,
+            margin_end=4,
+        )
         self._dv: DataView | None = None
 
         self.pack_start(Gtk.Label(label="Go to offset:"), False, False, 0)
@@ -45,7 +50,7 @@ class GotoOffsetBar(Gtk.Box):
         self._entry = Gtk.Entry()
         self._entry.set_width_chars(18)
         self._entry.set_placeholder_text("decimal or 0x…")
-        self._entry.connect("activate",        lambda _: self._go())
+        self._entry.connect("activate", lambda _: self._go())
         self._entry.connect("key-press-event", self._on_key)
         self.pack_start(self._entry, False, False, 0)
 
@@ -59,8 +64,7 @@ class GotoOffsetBar(Gtk.Box):
 
         close = Gtk.Button()
         close.set_relief(Gtk.ReliefStyle.NONE)
-        close.add(Gtk.Image.new_from_icon_name("window-close-symbolic",
-                                               Gtk.IconSize.MENU))
+        close.add(Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU))
         close.connect("clicked", lambda _: self.hide_bar())
         self.pack_end(close, False, False, 0)
 
@@ -91,17 +95,16 @@ class GotoOffsetBar(Gtk.Box):
             return
         offset = _parse_offset(self._entry.get_text())
         if offset is None:
-            self._status.set_markup(
-                '<span foreground="red">Invalid offset.</span>')
+            self._status.set_markup('<span foreground="red">Invalid offset.</span>')
             return
         buf_size = dv.buffer.size
         if offset < 0 or offset >= buf_size:
             self._status.set_markup(
-                f'<span foreground="red">Out of range (0–0x{max(0,buf_size-1):x}).</span>')
+                f'<span foreground="red">Out of range (0–0x{max(0, buf_size - 1):x}).</span>'
+            )
             return
         dv.display.make_offset_visible(offset, "start")
         dv.move_cursor(offset, 0)
         dv.set_selection(-1, -1)
-        self._status.set_markup(
-            f'<span foreground="#006600">Jumped to 0x{offset:x}.</span>')
+        self._status.set_markup(f'<span foreground="#006600">Jumped to 0x{offset:x}.</span>')
         self.hide_bar()

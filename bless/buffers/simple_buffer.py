@@ -12,13 +12,13 @@ class SimpleBuffer(IBuffer):
         self._data = bytearray()
 
     def read(self, ba: bytearray, index: int, pos: int, length: int) -> int:
-        ba[index:index + length] = self._data[pos:pos + length]
+        ba[index : index + length] = self._data[pos : pos + length]
         return length
 
     def append(self, data: bytes, index: int, length: int) -> None:
         if length == 0:
             return
-        self._data.extend(data[index:index + length])
+        self._data.extend(data[index : index + length])
 
     def append_buffer(self, buf: IBuffer, index: int, length: int) -> None:
         if length == 0:
@@ -30,7 +30,7 @@ class SimpleBuffer(IBuffer):
     def insert(self, pos: int, data: bytes, index: int, length: int) -> None:
         if length == 0:
             return
-        self._data[pos:pos] = data[index:index + length]
+        self._data[pos:pos] = data[index : index + length]
 
     def __getitem__(self, index: int) -> int:
         if index >= len(self._data):

@@ -19,8 +19,18 @@ bless = "bless.main:main"
 
 [tool.ruff]
 line-length = 100
+target-version = "py312"
 
 [tool.ruff.lint]
+select = [
+    "F",   # pyflakes
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "G",   # flake8-logging-format
+    "PIE", # flake8-pie
+    "UP",  # pyupgrade
+]
+
 # E402: gi.require_version() must precede gi imports throughout the codebase.
 ignore = ["E402"]
 

@@ -16,10 +16,12 @@ def setup(verbose: bool = False) -> None:
     # Add handler exactly once so repeated calls don't duplicate output
     if _handler is None:
         _handler = logging.StreamHandler(sys.stderr)
-        _handler.setFormatter(logging.Formatter(
-            "%(asctime)s  %(levelname)-7s  %(name)s  %(message)s",
-            datefmt="%H:%M:%S",
-        ))
+        _handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s  %(levelname)-7s  %(name)s  %(message)s",
+                datefmt="%H:%M:%S",
+            )
+        )
         _logger.addHandler(_handler)
     _handler.setLevel(level)
 

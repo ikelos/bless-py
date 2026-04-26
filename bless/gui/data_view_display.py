@@ -46,19 +46,20 @@ class DataViewDisplay(Gtk.Box):
         self._drawing_area = Gtk.DrawingArea()
         ag.drawing_area = self._drawing_area
         ag.areas.clear()
-        for factory in (OffsetArea,
-                        lambda g: SeparatorArea(g),
-                        HexArea,
-                        lambda g: SeparatorArea(g),
-                        AsciiArea):
+        for factory in (
+            OffsetArea,
+            lambda g: SeparatorArea(g),
+            HexArea,
+            lambda g: SeparatorArea(g),
+            AsciiArea,
+        ):
             ag.areas.append(factory(ag))
 
         # ── Scrollbar ─────────────────────────────────────────────────
-        adj = Gtk.Adjustment(value=0, lower=0, upper=1,
-                             step_increment=1, page_increment=10,
-                             page_size=10)
-        self._vscroll = Gtk.Scrollbar(orientation=Gtk.Orientation.VERTICAL,
-                                      adjustment=adj)
+        adj = Gtk.Adjustment(
+            value=0, lower=0, upper=1, step_increment=1, page_increment=10, page_size=10
+        )
+        self._vscroll = Gtk.Scrollbar(orientation=Gtk.Orientation.VERTICAL, adjustment=adj)
         adj.connect("value-changed", self._on_scrolled)
 
         hex_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -76,9 +77,9 @@ class DataViewDisplay(Gtk.Box):
         self._file_changed_bar.set_no_show_all(True)
 
         # ── Find / replace / goto / select-range bars ─────────────────
-        self._find_bar         = FindBar()
+        self._find_bar = FindBar()
         self._find_replace_bar = FindReplaceBar()
-        self._goto_bar         = GotoOffsetBar()
+        self._goto_bar = GotoOffsetBar()
         self._select_range_bar = SelectRangeBar()
 
         # ── Conversion panel ──────────────────────────────────────────
@@ -88,31 +89,31 @@ class DataViewDisplay(Gtk.Box):
 
         # ── Pack everything ───────────────────────────────────────────
         self.pack_start(self._file_changed_bar, False, False, 0)
-        self.pack_start(hex_row,               True,  True,  0)
-        self.pack_start(self._find_bar,         False, False, 0)
+        self.pack_start(hex_row, True, True, 0)
+        self.pack_start(self._find_bar, False, False, 0)
         self.pack_start(self._find_replace_bar, False, False, 0)
-        self.pack_start(self._goto_bar,         False, False, 0)
+        self.pack_start(self._goto_bar, False, False, 0)
         self.pack_start(self._select_range_bar, False, False, 0)
-        self.pack_start(sep,                    False, False, 0)
-        self.pack_start(self._conv_panel,       False, False, 0)
+        self.pack_start(sep, False, False, 0)
+        self.pack_start(self._conv_panel, False, False, 0)
 
         # ── Wire drawing area events ──────────────────────────────────
         da = self._drawing_area
-        da.connect("realize",              self._on_realized)
-        da.connect("draw",                 self._on_drawn)
-        da.connect("configure-event",      self._on_configured)
-        da.connect("button-press-event",   self._on_button_press)
+        da.connect("realize", self._on_realized)
+        da.connect("draw", self._on_drawn)
+        da.connect("configure-event", self._on_configured)
+        da.connect("button-press-event", self._on_button_press)
         da.connect("button-release-event", self._on_button_release)
-        da.connect("motion-notify-event",  self._on_motion_notify)
-        da.connect("key-press-event",      self._on_key_press)
-        da.connect("scroll-event",         self._on_scroll)
+        da.connect("motion-notify-event", self._on_motion_notify)
+        da.connect("key-press-event", self._on_key_press)
+        da.connect("scroll-event", self._on_scroll)
         da.add_events(
-            Gdk.EventMask.BUTTON_PRESS_MASK   |
-            Gdk.EventMask.BUTTON_RELEASE_MASK |
-            Gdk.EventMask.POINTER_MOTION_MASK |
-            Gdk.EventMask.KEY_PRESS_MASK      |
-            Gdk.EventMask.SCROLL_MASK         |
-            Gdk.EventMask.SMOOTH_SCROLL_MASK
+            Gdk.EventMask.BUTTON_PRESS_MASK
+            | Gdk.EventMask.BUTTON_RELEASE_MASK
+            | Gdk.EventMask.POINTER_MOTION_MASK
+            | Gdk.EventMask.KEY_PRESS_MASK
+            | Gdk.EventMask.SCROLL_MASK
+            | Gdk.EventMask.SMOOTH_SCROLL_MASK
         )
         da.set_can_focus(True)
 
@@ -193,9 +194,9 @@ class DataViewDisplay(Gtk.Box):
         x = 0
         font_h = win_h
         for a in ag.areas:
-            a.bpr    = bpr
-            a.width  = max(0, a.calc_width(bpr, force=True))
-            a.x      = x
+            a.bpr = bpr
+            a.width = max(0, a.calc_width(bpr, force=True))
+            a.x = x
             a.height = win_h
             x += a.width
             if a.drawer and 0 < a.drawer.height < font_h:
@@ -215,8 +216,8 @@ class DataViewDisplay(Gtk.Box):
             return
         buf_size = dv.buffer.size
         nrows = (buf_size + bpr - 1) // bpr
-        adj   = self._vscroll.get_adjustment()
-        page  = adj.get_page_size()
+        adj = self._vscroll.get_adjustment()
+        page = adj.get_page_size()
         if nrows <= page:
             self._vscroll.set_value(0)
             adj.set_lower(0)
@@ -236,15 +237,15 @@ class DataViewDisplay(Gtk.Box):
         if not ag.areas:
             return
         first = ag.areas[0]
-        bpr   = first.bpr
+        bpr = first.bpr
         if bpr <= 0:
             return
         font_h = first.drawer.height if first.drawer else 16
-        nrows  = first.height // font_h if font_h else 1
+        nrows = first.height // font_h if font_h else 1
         cur_row = ag.offset // bpr
         end_row = cur_row + nrows - 1
-        tgt_row = offset  // bpr
-        adj     = self._vscroll.get_adjustment()
+        tgt_row = offset // bpr
+        adj = self._vscroll.get_adjustment()
 
         def _set(row: int) -> None:
             adj.set_value(max(0.0, float(row)))

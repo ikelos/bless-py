@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 class ListNode:
     """Node of a doubly-linked intrusive list used by SegmentCollection."""
+
     __slots__ = ("data", "prev", "next")
 
     def __init__(self, data: Segment) -> None:
@@ -138,6 +139,7 @@ class Segment:
     def make_private_copy(self) -> None:
         """Replace the backing buffer with an in-memory copy."""
         from .simple_buffer import SimpleBuffer
+
         sb = SimpleBuffer()
         sb.append_buffer(self.buffer, self.start, self.size)
         self.buffer = sb

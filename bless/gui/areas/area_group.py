@@ -25,8 +25,9 @@ if TYPE_CHECKING:
 class Highlight(Range):
     """A coloured range overlay on the data view."""
 
-    def __init__(self, ht: HighlightType = HighlightType.Normal,
-                 start: int = 0, end: int = -1) -> None:
+    def __init__(
+        self, ht: HighlightType = HighlightType.Normal, start: int = 0, end: int = -1
+    ) -> None:
         super().__init__(start, end)
         self.type = ht
 
@@ -157,7 +158,7 @@ class AreaGroup:
         self._pattern_highlights.clear()
 
         self._selection.start = r.start
-        self._selection.end   = r.end
+        self._selection.end = r.end
         if not self._selection.is_empty():
             self._highlights.insert(self._selection)
             # Scan buffer for identical byte sequences and add PatternMatch highlights
@@ -169,7 +170,7 @@ class AreaGroup:
         if self._buffer is None or r.is_empty():
             return
         length = r.end - r.start + 1
-        if length < 1 or length > 256:   # skip very long selections
+        if length < 1 or length > 256:  # skip very long selections
             return
         # Read the selected pattern
         pattern = bytearray(length)
@@ -180,8 +181,9 @@ class AreaGroup:
             return
         # Scan the buffer for matches (simple BM-like scan)
         from ...tools.find import BMFindStrategy
+
         strategy = BMFindStrategy()
-        strategy.buffer  = self._buffer
+        strategy.buffer = self._buffer
         strategy.pattern = bytes(pattern)
         strategy.position = 0
         while True:
@@ -206,10 +208,10 @@ class AreaGroup:
         first_area = self._areas[0] if self._areas else None
         if first_area is None or first_area.drawer is None or first_area.bpr <= 0:
             return
-        bpr    = first_area.bpr
-        da_h   = self._drawing_area.get_allocated_height()
-        row_h  = first_area.drawer.height
-        nrows  = (da_h + row_h - 1) // row_h if row_h else 1
+        bpr = first_area.bpr
+        da_h = self._drawing_area.get_allocated_height()
+        row_h = first_area.drawer.height
+        nrows = (da_h + row_h - 1) // row_h if row_h else 1
         n_bytes = min(nrows * bpr, max(0, self._buffer.size - self._offset))
         if n_bytes <= 0:
             self._buffer_cache = bytearray()
@@ -227,13 +229,13 @@ class AreaGroup:
             while pos < n_bytes and seg2 is not None:
                 seg_start = seg2.start + (cur_off - mapping2)
                 seg_avail = seg2.end - seg_start + 1
-                to_read   = min(seg_avail, n_bytes - pos)
+                to_read = min(seg_avail, n_bytes - pos)
                 seg2.buffer.read(self._buffer_cache, pos, seg_start, to_read)
-                pos     += to_read
+                pos += to_read
                 cur_off += to_read
                 if node2 and node2.next:
-                    node2    = node2.next
-                    seg2     = node2.data
+                    node2 = node2.next
+                    seg2 = node2.data
                     mapping2 = cur_off  # mapping of next segment
                 else:
                     break
@@ -272,8 +274,7 @@ class AreaGroup:
         first = self._areas[0]
         bpr = first.bpr if first.bpr > 0 else 1
         drawer_h = first.drawer.height if first.drawer else 16
-        da_h = (self._drawing_area.get_allocated_height()
-                if self._drawing_area else 0)
+        da_h = self._drawing_area.get_allocated_height() if self._drawing_area else 0
         nrows = da_h // drawer_h if drawer_h else 1
         view_end = self._offset + nrows * bpr
         view_range = Range(self._offset, view_end)

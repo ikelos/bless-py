@@ -21,7 +21,7 @@ def _parse_val(text: str) -> int | None:
     if not t:
         return None
     try:
-        if t.startswith("0x") or t.startswith("0X"):
+        if t.startswith(("0x", "0X")):
             return int(t, 16)
         return int(t, 10)
     except ValueError:
@@ -40,9 +40,14 @@ class SelectRangeBar(Gtk.Box):
     """
 
     def __init__(self) -> None:
-        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6,
-                         margin_top=3, margin_bottom=3,
-                         margin_start=6, margin_end=6)
+        super().__init__(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            spacing=6,
+            margin_top=3,
+            margin_bottom=3,
+            margin_start=6,
+            margin_end=6,
+        )
         self._dv: DataView | None = None
 
         self.pack_start(Gtk.Label(label="Select range from:"), False, False, 0)
@@ -64,7 +69,10 @@ class SelectRangeBar(Gtk.Box):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         btn_box.pack_start(
             Gtk.Image.new_from_icon_name("object-select-symbolic", Gtk.IconSize.BUTTON),
-            False, False, 0)
+            False,
+            False,
+            0,
+        )
         btn_box.pack_start(Gtk.Label(label="Select"), False, False, 0)
         self._btn_select.add(btn_box)
         self._btn_select.set_sensitive(False)
@@ -74,18 +82,17 @@ class SelectRangeBar(Gtk.Box):
         # Close button
         close = Gtk.Button()
         close.set_relief(Gtk.ReliefStyle.NONE)
-        close.add(Gtk.Image.new_from_icon_name("window-close-symbolic",
-                                               Gtk.IconSize.MENU))
+        close.add(Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU))
         close.connect("clicked", lambda _: self.hide_bar())
         self.pack_start(close, False, False, 0)
 
         # Wire validation to every keystroke
         self._from_entry.connect("changed", lambda _: self._validate())
-        self._to_entry.connect("changed",   lambda _: self._validate())
+        self._to_entry.connect("changed", lambda _: self._validate())
         self._from_entry.connect("activate", lambda _: self._to_entry.grab_focus())
-        self._to_entry.connect("activate",   lambda _: self._do_select())
+        self._to_entry.connect("activate", lambda _: self._do_select())
         self._from_entry.connect("key-press-event", self._on_key)
-        self._to_entry.connect("key-press-event",   self._on_key)
+        self._to_entry.connect("key-press-event", self._on_key)
 
         self.set_no_show_all(True)
 
@@ -115,7 +122,7 @@ class SelectRangeBar(Gtk.Box):
         """Return True and enable Select button when both fields are valid."""
         a = _parse_val(self._from_entry.get_text())
         b = _parse_val(self._to_entry.get_text())
-        ok = (a is not None and b is not None)
+        ok = a is not None and b is not None
         self._btn_select.set_sensitive(ok)
         return ok
 

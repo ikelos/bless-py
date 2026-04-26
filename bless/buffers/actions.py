@@ -36,6 +36,7 @@ class ByteBufferAction(ABC):
 # Append
 # ---------------------------------------------------------------------------
 
+
 class AppendAction(ByteBufferAction):
     def __init__(self, data: bytes, index: int, length: int, bb: ByteBuffer) -> None:
         self._bb = bb
@@ -62,6 +63,7 @@ class AppendAction(ByteBufferAction):
 # ---------------------------------------------------------------------------
 # Insert
 # ---------------------------------------------------------------------------
+
 
 class InsertAction(ByteBufferAction):
     def __init__(self, pos: int, data: bytes, index: int, length: int, bb: ByteBuffer) -> None:
@@ -93,6 +95,7 @@ class InsertAction(ByteBufferAction):
 # Delete
 # ---------------------------------------------------------------------------
 
+
 class DeleteAction(ByteBufferAction):
     def __init__(self, pos1: int, pos2: int, bb: ByteBuffer) -> None:
         self._bb = bb
@@ -120,19 +123,18 @@ class DeleteAction(ByteBufferAction):
     def private_copy_size(self) -> int:
         if self._deleted is None:
             return 0
-        return sum(
-            seg.size for seg in self._deleted.list
-            if isinstance(seg.buffer, FileBuffer)
-        )
+        return sum(seg.size for seg in self._deleted.list if isinstance(seg.buffer, FileBuffer))
 
 
 # ---------------------------------------------------------------------------
 # Replace  (= Delete + Insert)
 # ---------------------------------------------------------------------------
 
+
 class ReplaceAction(ByteBufferAction):
-    def __init__(self, pos1: int, pos2: int, data: bytes, index: int, length: int,
-                 bb: ByteBuffer) -> None:
+    def __init__(
+        self, pos1: int, pos2: int, data: bytes, index: int, length: int, bb: ByteBuffer
+    ) -> None:
         self._del = DeleteAction(pos1, pos2, bb)
         self._ins = InsertAction(pos1, data, index, length, bb)
 
@@ -154,6 +156,7 @@ class ReplaceAction(ByteBufferAction):
 # ---------------------------------------------------------------------------
 # Multi  (container for chained actions)
 # ---------------------------------------------------------------------------
+
 
 class MultiAction(ByteBufferAction):
     def __init__(self) -> None:

@@ -18,8 +18,8 @@ class Preferences:
     """
 
     _instance: Preferences | None = None
-    _default:  Preferences | None = None
-    _proxy:    PreferencesProxy | None = None
+    _default: Preferences | None = None
+    _proxy: PreferencesProxy | None = None
 
     @classmethod
     def instance(cls) -> Preferences:
@@ -128,8 +128,7 @@ class PreferencesProxy:
     def enable(self, value: bool) -> None:
         self._enabled = value
 
-    def subscribe(self, key: str, sub_id: str,
-                  handler: PreferencesChangedHandler) -> None:
+    def subscribe(self, key: str, sub_id: str, handler: PreferencesChangedHandler) -> None:
         self._subscribers.setdefault(key, {})[sub_id] = handler
 
     def unsubscribe(self, key: str, sub_id: str) -> None:

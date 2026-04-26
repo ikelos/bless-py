@@ -17,21 +17,21 @@ if TYPE_CHECKING:
 
 # Fixed char widths so column positions never shift
 _VAL_CHARS = {
-    "Signed 8 bit":    5,    # -128 .. 127
-    "Unsigned 8 bit":  3,    # 0 .. 255
-    "Signed 16 bit":   7,    # -32768 .. 32767
+    "Signed 8 bit": 5,  # -128 .. 127
+    "Unsigned 8 bit": 3,  # 0 .. 255
+    "Signed 16 bit": 7,  # -32768 .. 32767
     "Unsigned 16 bit": 5,
-    "Signed 32 bit":   12,   # -2147483648
+    "Signed 32 bit": 12,  # -2147483648
     "Unsigned 32 bit": 10,
-    "Signed 64 bit":   21,
+    "Signed 64 bit": 21,
     "Unsigned 64 bit": 20,
-    "Float 32 bit":    16,
-    "Float 64 bit":    24,
-    "Hexadecimal":     14,   # "XX XX XX XX"
-    "Decimal":         12,   # "000 000 000 000"
-    "Octal":           16,
-    "Binary":          9,    # "00000000"
-    "ASCII Text":      9,    # 8 chars + padding
+    "Float 32 bit": 16,
+    "Float 64 bit": 24,
+    "Hexadecimal": 14,  # "XX XX XX XX"
+    "Decimal": 12,  # "000 000 000 000"
+    "Octal": 16,
+    "Binary": 9,  # "00000000"
+    "ASCII Text": 9,  # 8 chars + padding
 }
 
 
@@ -54,9 +54,14 @@ class ConversionPanel(Gtk.Frame):
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         vbox.pack_start(sep, False, False, 0)
 
-        grid = Gtk.Grid(column_spacing=8, row_spacing=4,
-                        margin_top=4, margin_bottom=4,
-                        margin_start=8, margin_end=8)
+        grid = Gtk.Grid(
+            column_spacing=8,
+            row_spacing=4,
+            margin_top=4,
+            margin_bottom=4,
+            margin_start=8,
+            margin_end=8,
+        )
         vbox.pack_start(grid, False, False, 0)
 
         col0_labels = [
@@ -105,17 +110,17 @@ class ConversionPanel(Gtk.Frame):
         for row, text in enumerate(col0_labels):
             key = text.rstrip(":")
             grid.attach(_head(text), 0, row, 1, 1)
-            grid.attach(_val(key),   1, row, 1, 1)
+            grid.attach(_val(key), 1, row, 1, 1)
 
         for row, text in enumerate(col2_labels):
             key = text.rstrip(":")
             grid.attach(_head(text), 2, row, 1, 1)
-            grid.attach(_val(key),   3, row, 1, 1)
+            grid.attach(_val(key), 3, row, 1, 1)
 
         for row, text in enumerate(col4_labels):
             key = text.rstrip(":")
             grid.attach(_head(text), 4, row, 1, 1)
-            grid.attach(_val(key),   5, row, 1, 1)
+            grid.attach(_val(key), 5, row, 1, 1)
 
         self._le_check = Gtk.CheckButton(label="Show little endian decoding")
         grid.attach(self._le_check, 0, 6, 3, 1)
@@ -125,7 +130,7 @@ class ConversionPanel(Gtk.Frame):
         grid.attach(self._hex_check, 3, 6, 3, 1)
         self._hex_check.connect("toggled", lambda _: self._refresh())
 
-        self._current_bytes  = b""
+        self._current_bytes = b""
         self._current_offset = 0
 
     def attach_view(self, dv: DataView) -> None:
@@ -140,21 +145,21 @@ class ConversionPanel(Gtk.Frame):
         if dv is None or dv.buffer is None:
             self._clear()
             return
-        buf    = dv.buffer
+        buf = dv.buffer
         offset = max(0, min(dv.cursor_offset, buf.size - 1)) if buf.size > 0 else 0
         n = min(8, max(0, buf.size - offset))
         raw = bytearray(n)
         for i in range(n):
             raw[i] = buf[offset + i]
-        self._current_bytes  = bytes(raw)
+        self._current_bytes = bytes(raw)
         self._current_offset = offset
         self._refresh()
 
     def _refresh(self) -> None:
-        data   = self._current_bytes
-        le     = self._le_check.get_active()
+        data = self._current_bytes
+        le = self._le_check.get_active()
         as_hex = self._hex_check.get_active()
-        end    = "<" if le else ">"
+        end = "<" if le else ">"
 
         def _set(key: str, value: str) -> None:
             lbl = self._value_labels.get(key)
@@ -183,25 +188,25 @@ class ConversionPanel(Gtk.Frame):
 
         b0 = data[0] if data else None
 
-        _set("Signed 8 bit",   str(struct.unpack("b", data[:1])[0]) if b0 is not None else "—")
+        _set("Signed 8 bit", str(struct.unpack("b", data[:1])[0]) if b0 is not None else "—")
         _set("Unsigned 8 bit", str(b0) if b0 is not None else "—")
-        _int("Signed 16 bit",   "h", 2)
+        _int("Signed 16 bit", "h", 2)
         _int("Unsigned 16 bit", "H", 2)
-        _int("Signed 32 bit",   "i", 4)
+        _int("Signed 32 bit", "i", 4)
         _int("Unsigned 32 bit", "I", 4)
-        _int("Signed 64 bit",   "q", 8)
+        _int("Signed 64 bit", "q", 8)
         _int("Unsigned 64 bit", "Q", 8)
-        _float("Float 32 bit",  "f", 4)
-        _float("Float 64 bit",  "d", 8)
+        _float("Float 32 bit", "f", 4)
+        _float("Float 64 bit", "d", 8)
 
         if b0 is not None:
             _set("Hexadecimal", " ".join(f"{x:02X}" for x in data[:4]))
-            _set("Decimal",     " ".join(str(x)     for x in data[:4]))
-            _set("Octal",       " ".join(f"{x:03o}" for x in data[:4]))
-            _set("Binary",      format(b0, "08b"))
-            _set("ASCII Text",  "".join(chr(x) if 0x20 <= x < 0x7F else "." for x in data[:8]))
+            _set("Decimal", " ".join(str(x) for x in data[:4]))
+            _set("Octal", " ".join(f"{x:03o}" for x in data[:4]))
+            _set("Binary", format(b0, "08b"))
+            _set("ASCII Text", "".join(chr(x) if 0x20 <= x < 0x7F else "." for x in data[:8]))
         else:
-            for k in ("Hexadecimal","Decimal","Octal","Binary","ASCII Text"):
+            for k in ("Hexadecimal", "Decimal", "Octal", "Binary", "ASCII Text"):
                 _set(k, "—")
 
     def _clear(self) -> None:

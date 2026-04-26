@@ -11,6 +11,7 @@ from .ibuffer import IBuffer
 try:
     import fcntl
     import struct
+
     BLKGETSIZE64 = 0x80081272
     _HAS_BLKGETSIZE64 = True
 except ImportError:
@@ -102,7 +103,7 @@ class FileBuffer(IBuffer):
             length = self._file_length - pos
         self._fp.seek(pos)
         chunk = self._fp.read(length)
-        ba[index:index + len(chunk)] = chunk
+        ba[index : index + len(chunk)] = chunk
         return len(chunk)
 
     def __getitem__(self, index: int) -> int:

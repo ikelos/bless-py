@@ -33,7 +33,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_icon_name("accessories-text-editor")
 
         self._data_book = DataBook()
-        self._file_ops  = FileOperations(self._data_book, self)
+        self._file_ops = FileOperations(self._data_book, self)
         self._initial_files = list(files) if files else []
         self._statusbar_radix: int = 16
         self._syncing_toggles: bool = False
@@ -95,29 +95,27 @@ class MainWindow(Gtk.ApplicationWindow):
         self._ctx = self._statusbar.get_context_id("main")
         # Enable button events so clicking cycles the display radix
         self._statusbar.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
-        self._statusbar.connect("button-press-event",
-                                lambda *_: self._cycle_statusbar_radix())
+        self._statusbar.connect("button-press-event", lambda *_: self._cycle_statusbar_radix())
 
         # Keyboard accelerators
         accel = Gtk.AccelGroup()
         self.add_accel_group(accel)
 
         def _accel(key, mods, fn):
-            accel.connect(Gdk.keyval_from_name(key), mods,
-                          Gtk.AccelFlags.VISIBLE, lambda *_: fn())
+            accel.connect(Gdk.keyval_from_name(key), mods, Gtk.AccelFlags.VISIBLE, lambda *_: fn())
 
-        ctrl       = Gdk.ModifierType.CONTROL_MASK
+        ctrl = Gdk.ModifierType.CONTROL_MASK
         ctrl_shift = Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK
 
-        _accel("z", ctrl,       lambda: self._current_dv_call("undo"))
+        _accel("z", ctrl, lambda: self._current_dv_call("undo"))
         _accel("z", ctrl_shift, lambda: self._current_dv_call("redo"))
-        _accel("a", ctrl,       self._select_all)
+        _accel("a", ctrl, self._select_all)
         _accel("r", ctrl_shift, self._show_select_range)
 
         # File shortcuts
-        _accel("n", ctrl,       lambda: self._file_ops.new_file())
-        _accel("o", ctrl,       lambda: self._file_ops.open_file())
-        _accel("s", ctrl,       lambda: self._file_ops.save_file())
+        _accel("n", ctrl, lambda: self._file_ops.new_file())
+        _accel("o", ctrl, lambda: self._file_ops.open_file())
+        _accel("s", ctrl, lambda: self._file_ops.save_file())
         _accel("s", ctrl_shift, lambda: self._file_ops.save_file_as())
 
     def _build_menu_bar(self) -> Gtk.MenuBar:
@@ -130,12 +128,12 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # --- File ---
         file_menu = Gtk.Menu()
-        file_menu.append(_item("_New              Ctrl+N",  lambda *_: self._file_ops.new_file()))
-        file_menu.append(_item("_Open…            Ctrl+O",  lambda *_: self._file_ops.open_file()))
-        self._mi_save   = _item("_Save             Ctrl+S",  lambda *_: self._file_ops.save_file())
-        self._mi_saveas = _item("Save _As…  Shift+Ctrl+S",  lambda *_: self._file_ops.save_file_as())
-        self._mi_revert = _item("_Revert",                  lambda *_: self._file_ops.revert_file())
-        self._mi_close  = _item("_Close",                   lambda *_: self._file_ops.close_file())
+        file_menu.append(_item("_New              Ctrl+N", lambda *_: self._file_ops.new_file()))
+        file_menu.append(_item("_Open…            Ctrl+O", lambda *_: self._file_ops.open_file()))
+        self._mi_save = _item("_Save             Ctrl+S", lambda *_: self._file_ops.save_file())
+        self._mi_saveas = _item("Save _As…  Shift+Ctrl+S", lambda *_: self._file_ops.save_file_as())
+        self._mi_revert = _item("_Revert", lambda *_: self._file_ops.revert_file())
+        self._mi_close = _item("_Close", lambda *_: self._file_ops.close_file())
         for it in (self._mi_save, self._mi_saveas, self._mi_revert):
             file_menu.append(it)
         file_menu.append(Gtk.SeparatorMenuItem())
@@ -147,20 +145,20 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # --- Edit ---
         edit_menu = Gtk.Menu()
-        self._mi_undo = _item("_Undo         Ctrl+Z",       lambda *_: self._current_dv_call("undo"))
-        self._mi_redo = _item("_Redo  Shift+Ctrl+Z",        lambda *_: self._current_dv_call("redo"))
+        self._mi_undo = _item("_Undo         Ctrl+Z", lambda *_: self._current_dv_call("undo"))
+        self._mi_redo = _item("_Redo  Shift+Ctrl+Z", lambda *_: self._current_dv_call("redo"))
         edit_menu.append(self._mi_undo)
         edit_menu.append(self._mi_redo)
         edit_menu.append(Gtk.SeparatorMenuItem())
         for label, cb in (
-            ("Cu_t",                        lambda *_: self._current_dv_call("cut")),
-            ("_Copy",                       lambda *_: self._current_dv_call("copy")),
-            ("_Paste",                      lambda *_: self._current_dv_call("paste")),
-            ("_Delete",                     lambda *_: self._current_dv_call("delete")),
+            ("Cu_t", lambda *_: self._current_dv_call("cut")),
+            ("_Copy", lambda *_: self._current_dv_call("copy")),
+            ("_Paste", lambda *_: self._current_dv_call("paste")),
+            ("_Delete", lambda *_: self._current_dv_call("delete")),
         ):
             edit_menu.append(_item(label, cb))
         edit_menu.append(Gtk.SeparatorMenuItem())
-        edit_menu.append(_item("Select _All         Ctrl+A",  lambda *_: self._select_all()))
+        edit_menu.append(_item("Select _All         Ctrl+A", lambda *_: self._select_all()))
         edit_menu.append(_item("Select _Range  Shift+Ctrl+R", lambda *_: self._show_select_range()))
         ei = Gtk.MenuItem.new_with_mnemonic("_Edit")
         ei.set_submenu(edit_menu)
@@ -168,10 +166,10 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # --- Search ---
         search_menu = Gtk.Menu()
-        search_menu.append(_item("_Find…            Ctrl+F",   lambda *_: self._show_find()))
-        search_menu.append(_item("Find & _Replace…  Ctrl+H",   lambda *_: self._show_find_replace()))
+        search_menu.append(_item("_Find…            Ctrl+F", lambda *_: self._show_find()))
+        search_menu.append(_item("Find & _Replace…  Ctrl+H", lambda *_: self._show_find_replace()))
         search_menu.append(Gtk.SeparatorMenuItem())
-        search_menu.append(_item("_Go to Offset…    Ctrl+G",   lambda *_: self._show_goto()))
+        search_menu.append(_item("_Go to Offset…    Ctrl+G", lambda *_: self._show_goto()))
         si = Gtk.MenuItem.new_with_mnemonic("_Search")
         si.set_submenu(search_menu)
         mb.append(si)
@@ -187,11 +185,11 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _update_menu_sensitivity(self, dv: DataView | None) -> None:
         """Enable/disable menu items based on current buffer state."""
-        has_buf     = dv is not None and dv.buffer is not None
-        has_file    = has_buf and dv.buffer.has_file
+        has_buf = dv is not None and dv.buffer is not None
+        has_file = has_buf and dv.buffer.has_file
         has_changed = has_buf and dv.buffer.has_changed
-        can_undo    = has_buf and dv.buffer.can_undo
-        can_redo    = has_buf and dv.buffer.can_redo
+        can_undo = has_buf and dv.buffer.can_undo
+        can_redo = has_buf and dv.buffer.can_redo
 
         self._mi_undo.set_sensitive(can_undo)
         self._mi_redo.set_sensitive(can_redo)
@@ -211,43 +209,55 @@ class MainWindow(Gtk.ApplicationWindow):
 
         def _btn(icon: str, tip: str, cb) -> Gtk.ToolButton:
             b = Gtk.ToolButton.new(
-                Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.SMALL_TOOLBAR), tip)
+                Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.SMALL_TOOLBAR), tip
+            )
             b.set_tooltip_text(tip)
             b.connect("clicked", cb)
             return b
 
         def _toggle(icon: str, tip: str, cb) -> Gtk.ToggleToolButton:
             b = Gtk.ToggleToolButton.new()
-            b.set_icon_widget(
-                Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.SMALL_TOOLBAR))
+            b.set_icon_widget(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.SMALL_TOOLBAR))
             b.set_tooltip_text(tip)
             b.connect("toggled", cb)
             return b
 
-        self._tb_new    = _btn("document-new",  "New (Ctrl+N)", lambda *_: self._file_ops.new_file())
-        self._tb_open   = _btn("document-open", "Open (Ctrl+O)", lambda *_: self._file_ops.open_file())
-        self._tb_save   = _btn("document-save", "Save (Ctrl+S)", lambda *_: self._file_ops.save_file())
+        self._tb_new = _btn("document-new", "New (Ctrl+N)", lambda *_: self._file_ops.new_file())
+        self._tb_open = _btn(
+            "document-open", "Open (Ctrl+O)", lambda *_: self._file_ops.open_file()
+        )
+        self._tb_save = _btn(
+            "document-save", "Save (Ctrl+S)", lambda *_: self._file_ops.save_file()
+        )
 
-        self._tb_cut    = _btn("edit-cut",   "Cut",   lambda *_: self._current_dv_call("cut"))
-        self._tb_copy   = _btn("edit-copy",  "Copy",  lambda *_: self._current_dv_call("copy"))
-        self._tb_paste  = _btn("edit-paste", "Paste", lambda *_: self._current_dv_call("paste"))
+        self._tb_cut = _btn("edit-cut", "Cut", lambda *_: self._current_dv_call("cut"))
+        self._tb_copy = _btn("edit-copy", "Copy", lambda *_: self._current_dv_call("copy"))
+        self._tb_paste = _btn("edit-paste", "Paste", lambda *_: self._current_dv_call("paste"))
 
-        self._tb_undo   = _btn("edit-undo",  "Undo (Ctrl+Z)",       lambda *_: self._current_dv_call("undo"))
-        self._tb_redo   = _btn("edit-redo",  "Redo (Shift+Ctrl+Z)", lambda *_: self._current_dv_call("redo"))
+        self._tb_undo = _btn("edit-undo", "Undo (Ctrl+Z)", lambda *_: self._current_dv_call("undo"))
+        self._tb_redo = _btn(
+            "edit-redo", "Redo (Shift+Ctrl+Z)", lambda *_: self._current_dv_call("redo")
+        )
 
-        self._tb_find = _toggle("edit-find", "Find (Ctrl+F)",
-                                lambda b: self._on_find_toggle(b))
-        self._tb_findreplace = _toggle("edit-find-replace", "Find & Replace (Ctrl+H)",
-                                       lambda b: self._on_findreplace_toggle(b))
+        self._tb_find = _toggle("edit-find", "Find (Ctrl+F)", lambda b: self._on_find_toggle(b))
+        self._tb_findreplace = _toggle(
+            "edit-find-replace", "Find & Replace (Ctrl+H)", lambda b: self._on_findreplace_toggle(b)
+        )
 
         for item in (
-            self._tb_new, self._tb_open, self._tb_save,
+            self._tb_new,
+            self._tb_open,
+            self._tb_save,
             Gtk.SeparatorToolItem(),
-            self._tb_cut, self._tb_copy, self._tb_paste,
+            self._tb_cut,
+            self._tb_copy,
+            self._tb_paste,
             Gtk.SeparatorToolItem(),
-            self._tb_undo, self._tb_redo,
+            self._tb_undo,
+            self._tb_redo,
             Gtk.SeparatorToolItem(),
-            self._tb_find, self._tb_findreplace,
+            self._tb_find,
+            self._tb_findreplace,
         ):
             tb.insert(item, -1)
 
@@ -287,7 +297,7 @@ class MainWindow(Gtk.ApplicationWindow):
         try:
             if dv is None:
                 dv = self._data_book.current_view
-            find_active    = dv is not None and dv.display.find_bar.get_visible()
+            find_active = dv is not None and dv.display.find_bar.get_visible()
             replace_active = dv is not None and dv.display.find_replace_bar.get_visible()
             self._tb_find.set_active(find_active)
             self._tb_findreplace.set_active(replace_active)
@@ -382,14 +392,10 @@ class MainWindow(Gtk.ApplicationWindow):
         dv.connect_buffer_changed(lambda d: self._update_menu_sensitivity(d))
         dv.connect_cursor_changed(lambda d: self._update_menu_sensitivity(d))
         # Sync toolbar toggles when bars are shown/hidden (e.g. via Ctrl+F)
-        dv.display.find_bar.connect(
-            "show", lambda *_: self._sync_find_toolbar(dv))
-        dv.display.find_bar.connect(
-            "hide", lambda *_: self._sync_find_toolbar(dv))
-        dv.display.find_replace_bar.connect(
-            "show", lambda *_: self._sync_find_toolbar(dv))
-        dv.display.find_replace_bar.connect(
-            "hide", lambda *_: self._sync_find_toolbar(dv))
+        dv.display.find_bar.connect("show", lambda *_: self._sync_find_toolbar(dv))
+        dv.display.find_bar.connect("hide", lambda *_: self._sync_find_toolbar(dv))
+        dv.display.find_replace_bar.connect("show", lambda *_: self._sync_find_toolbar(dv))
+        dv.display.find_replace_bar.connect("hide", lambda *_: self._sync_find_toolbar(dv))
 
     def _on_switch_page(self, nb, widget, n) -> None:
         dv = self._data_book.current_view
@@ -413,9 +419,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _cycle_statusbar_radix(self) -> None:
         radices = [16, 10, 8]
-        self._statusbar_radix = radices[
-            (radices.index(self._statusbar_radix) + 1) % len(radices)
-        ]
+        self._statusbar_radix = radices[(radices.index(self._statusbar_radix) + 1) % len(radices)]
         dv = self._data_book.current_view
         if dv:
             self._update_statusbar(dv)
@@ -434,15 +438,15 @@ class MainWindow(Gtk.ApplicationWindow):
         if dv.buffer is None:
             self._statusbar.push(self._ctx, "")
             return
-        r    = self._statusbar_radix
-        off  = dv.cursor_offset
+        r = self._statusbar_radix
+        off = dv.cursor_offset
         size = dv.buffer.size
-        sel  = dv.selection
+        sel = dv.selection
         mode = "OVR" if dv.overwrite else "INS"
 
         sel_str = "Selection: None"
         if not sel.is_empty() and sel.start >= 0 and sel.end >= sel.start:
-            n    = sel.end - sel.start + 1
+            n = sel.end - sel.start + 1
             unit = "byte" if n == 1 else "bytes"
             sel_str = (
                 f"Selection: {self._fmt(sel.start, r)}"
@@ -452,9 +456,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self._statusbar.push(
             self._ctx,
-            f"Offset: {self._fmt(off, r)} / {self._fmt(max(0, size-1), r)}"
+            f"Offset: {self._fmt(off, r)} / {self._fmt(max(0, size - 1), r)}"
             f"  |  Size: {self._fmt(size, r)}"
-            f"  |  {sel_str}  |  {mode}"
+            f"  |  {sel_str}  |  {mode}",
         )
 
     def _update_title(self, dv: DataView) -> None:
@@ -480,11 +484,12 @@ class MainWindow(Gtk.ApplicationWindow):
 # Application entry-point
 # ---------------------------------------------------------------------------
 
-class BlessApplication(Gtk.Application):
 
+class BlessApplication(Gtk.Application):
     def __init__(self) -> None:
-        super().__init__(application_id="org.bless.hexeditor",
-                         flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        super().__init__(
+            application_id="org.bless.hexeditor", flags=Gio.ApplicationFlags.HANDLES_OPEN
+        )
         self._window: MainWindow | None = None
 
     def do_activate(self) -> None:
@@ -513,10 +518,11 @@ def main(args: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="bless",
         description="Bless Hex Editor",
-        add_help=False,   # let GApplication handle --help
+        add_help=False,  # let GApplication handle --help
     )
-    parser.add_argument("--debug", action="store_true",
-                        help="Enable verbose diagnostic logging to stderr")
+    parser.add_argument(
+        "--debug", action="store_true", help="Enable verbose diagnostic logging to stderr"
+    )
     known, remaining = parser.parse_known_args(args[1:])
     _log_setup(verbose=known.debug)
 
