@@ -13,10 +13,12 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk
 
+from ..logger import get as _log
 from ..tools.preferences import Preferences
 from .data_book import DataBook
 from .data_view import DataView
 from .plugins.file_operations import FileOperations
+from .session import load_session, save_session
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -27,7 +29,12 @@ class MainWindow(Gtk.ApplicationWindow):
     wires up all file / edit / search actions; and handles drag-and-drop.
     """
 
-    def __init__(self, app: Gtk.Application, files: list[str] = None) -> None:
+    def __init__(
+        self,
+        app: Gtk.Application,
+        files: list[str] = None,
+        restore: bool = True,
+    ) -> None:
         super().__init__(application=app, title="Bless Hex Editor")
         self.set_default_size(900, 600)
         self.set_icon_name("accessories-text-editor")
@@ -35,6 +42,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._data_book = DataBook()
         self._file_ops = FileOperations(self._data_book, self)
         self._initial_files = list(files) if files else []
+        self._restore_session = restore
         self._statusbar_radix: int = 16
         self._syncing_toggles: bool = False
         # These are set in _build_menu_bar; declared here for type checkers
@@ -66,8 +74,15 @@ class MainWindow(Gtk.ApplicationWindow):
         if self._initial_files:
             for f in self._initial_files:
                 self._file_ops.open_file(f)
+        elif self._restore_session:
+            session_files = load_session()
+            for f in session_files:
+                self._file_ops.open_file(f)
+            if not session_files:
+                self._file_ops.new_file()
         else:
             self._file_ops.new_file()
+        self._save_session()
         return False  # don't repeat
 
     # ------------------------------------------------------------------
@@ -424,11 +439,29 @@ class MainWindow(Gtk.ApplicationWindow):
         # DataBook callbacks
         self._data_book.connect_page_added(self._on_page_added)
         self._data_book.connect_switch_page(self._on_switch_page)
+        self._wire_book_page_removed()
+
+    def _save_session(self, paths=None) -> list[str]:
+        """Persist the absolute paths of all open named buffers."""
+        paths = [
+            dv.buffer.filename
+            for dv in self._data_book.views
+            if dv.buffer is not None and dv.buffer.has_file
+        ]
+        _log().info(f"Saving session: {paths}")
+        save_session(paths)
+        return paths
 
     def _on_delete_event(self, widget, event) -> bool:
+        # Save session (with current open files) before closing
+        saved_paths = self._save_session()
         # Try to close all pages; if any cancels, block quit
         views = list(self._data_book.views)
-        return any(not self._file_ops.close_file(dv) for dv in views)
+        result = any(not self._file_ops.close_file(dv) for dv in views)
+        # This will close all files and *then* save the session, so resave after close
+        _log().info(f"Record final session: {saved_paths}")
+        save_session(saved_paths)
+        return result
 
     def _on_drag_data_received(self, widget, ctx, x, y, data, info, time) -> None:
         uris = data.get_uris()
@@ -451,6 +484,11 @@ class MainWindow(Gtk.ApplicationWindow):
         dv.display.find_bar.connect("hide", lambda *_: self._sync_find_toolbar(dv))
         dv.display.find_replace_bar.connect("show", lambda *_: self._sync_find_toolbar(dv))
         dv.display.find_replace_bar.connect("hide", lambda *_: self._sync_find_toolbar(dv))
+        # Persist session whenever a file is attached to this view
+        dv.connect_buffer_changed(lambda _d: self._save_session())
+
+    def _wire_book_page_removed(self) -> None:
+        self._data_book.connect_page_removed(lambda _dv: self._save_session())
 
     def _on_switch_page(self, nb, widget, n) -> None:
         dv = self._data_book.current_view
@@ -541,21 +579,22 @@ class MainWindow(Gtk.ApplicationWindow):
 
 
 class BlessApplication(Gtk.Application):
-    def __init__(self) -> None:
+    def __init__(self, restore: bool = True) -> None:
         super().__init__(
             application_id="org.bless.hexeditor", flags=Gio.ApplicationFlags.HANDLES_OPEN
         )
         self._window: MainWindow | None = None
+        self._restore = restore
 
     def do_activate(self) -> None:
         if self._window is None:
-            self._window = MainWindow(self)
+            self._window = MainWindow(self, restore=self._restore)
         self._window.present()
 
     def do_open(self, files, n_files, hint) -> None:
         paths = [f.get_path() for f in files]
         if self._window is None:
-            self._window = MainWindow(self, files=paths)
+            self._window = MainWindow(self, files=paths, restore=self._restore)
         else:
             for p in paths:
                 self._window._file_ops.open_file(p)
@@ -578,8 +617,13 @@ def main(args: list[str] | None = None) -> int:
     parser.add_argument(
         "--debug", action="store_true", help="Enable verbose diagnostic logging to stderr"
     )
+    parser.add_argument(
+        "--no-restore",
+        action="store_true",
+        help="Do not reopen files from the previous session (session is still recorded)",
+    )
     known, remaining = parser.parse_known_args(args[1:])
     _log_setup(verbose=known.debug)
 
-    app = BlessApplication()
+    app = BlessApplication(restore=not known.no_restore)
     return app.run([args[0]] + remaining)

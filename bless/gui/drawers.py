@@ -310,4 +310,3 @@ class BinaryDrawer(_MonoDrawer):
 
 class OffsetHexDrawer(HexDrawer):
     """Re-use HexDrawer for offset column rendering."""
-
