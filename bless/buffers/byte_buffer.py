@@ -467,8 +467,8 @@ class ByteBuffer:
                     self.read_allowed = True
                     self.modify_allowed = True
                     self._emit_events = True
-                    if self._watcher:
-                        self._watcher.start()
+                    if not self._watcher or not self._watcher.is_alive():
+                        self._setup_watcher()
 
                     self._emit_permissions_changed()
                     self._emit_changed()
@@ -549,8 +549,8 @@ class ByteBuffer:
                     self.modify_allowed = True
                     self.file_ops_allowed = True
                     self._emit_events = True
-                    if self._watcher:
-                        self._watcher.start()
+                    if not self._watcher or not self._watcher.is_alive():
+                        self._setup_watcher()
 
                     self._emit_permissions_changed()
                     self._emit_changed()
