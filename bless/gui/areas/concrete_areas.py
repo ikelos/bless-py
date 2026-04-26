@@ -563,14 +563,6 @@ class SeparatorArea(Area):
                 bg_color = a.drawer.get_background_color(RowType.Even, HighlightType.Normal)
                 break
 
-        # Always fill the ENTIRE column with background so there are no black holes
-        if bg_color:
-            cr.set_source_rgba(bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha)
-        else:
-            cr.set_source_rgb(1.0, 1.0, 1.0)
-        cr.rectangle(self.x, self.y, self.width, self.height)
-        cr.fill()
-
         # Compute how far down the line should extend
         row_h = 0
         for a in ag.areas:
@@ -595,6 +587,14 @@ class SeparatorArea(Area):
             content_rows = data_rows  # stop at the bottom of the last content row
 
         line_bottom = self.y + min(content_rows * row_h, self.height)
+
+        # Always fill the ENTIRE column with background so there are no black holes
+        if bg_color:
+            cr.set_source_rgba(bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha)
+        else:
+            cr.set_source_rgb(1.0, 1.0, 1.0)
+        cr.rectangle(self.x, self.y, self.width, self.height - (self.height % row_h))
+        cr.fill()
 
         # Draw the 1px vertical line only down to line_bottom
         cr.set_source_rgba(0.35, 0.35, 0.35, 1.0)

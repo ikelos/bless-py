@@ -102,7 +102,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # Search shortcuts
         _accel("<Actions>/Search/Find", "f", ctrl)
-        _accel("<Actions>/Search/FindReplace", "r", ctrl)
+        _accel("<Actions>/Search/FindReplace", "h", ctrl)
         _accel("<Actions>/Search/GotoOffset", "g", ctrl)
 
         return accel
