@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import gi
 
@@ -20,7 +20,6 @@ from .goto_offset import GotoOffsetBar
 from .select_range_bar import SelectRangeBar
 
 if TYPE_CHECKING:
-    from .areas.area import Area
     from .data_view import DataView
     from .data_view_control import DataViewControl
 

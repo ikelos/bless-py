@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import gi
 
@@ -12,8 +12,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
 from ...tools.find import BMFindStrategy, FindOperation, SimpleFindStrategy
-from ...util.base_converter import byte_array_to_string, string_to_byte_array
-from ...util.range import Range
+from ...util.base_converter import string_to_byte_array
 
 if TYPE_CHECKING:
     from ..data_book import DataBook

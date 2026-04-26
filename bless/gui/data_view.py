@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import gi
 
@@ -17,7 +17,6 @@ from gi.repository import Gdk, GLib, Gtk
 from ..buffers.byte_buffer import ByteBuffer
 from ..util.base_converter import byte_array_to_string, string_to_byte_array
 from ..util.range import Range
-from .areas.area_group import AreaGroup
 from .data_view_control import DataViewControl
 from .data_view_display import DataViewDisplay
 

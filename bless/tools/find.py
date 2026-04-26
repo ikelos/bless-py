@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import Optional
 
 from ..buffers.byte_buffer import ByteBuffer
 from ..util.range import Range

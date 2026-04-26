@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Optional
 
 import gi
 

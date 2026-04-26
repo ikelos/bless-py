@@ -10,7 +10,6 @@ import tempfile
 import threading
 from collections import deque
 from collections.abc import Callable
-from typing import Optional
 
 from .actions import (
     AppendAction,
@@ -21,10 +20,8 @@ from .actions import (
     ReplaceAction,
 )
 from .file_buffer import FileBuffer
-from .ibuffer import IBuffer
 from .segment import Segment
 from .segment_collection import SegmentCollection
-from .simple_buffer import SimpleBuffer
 
 # Progress callback type:  fn(value: float|str, action: str) -> bool
 ProgressCallback = Callable[[object, str], bool]

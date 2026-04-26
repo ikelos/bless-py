@@ -13,7 +13,6 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk
 
-from ..buffers.byte_buffer import ByteBuffer
 from ..tools.preferences import Preferences
 from .data_book import DataBook
 from .data_view import DataView

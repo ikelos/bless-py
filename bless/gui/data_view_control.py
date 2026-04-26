@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import gi
 
@@ -12,12 +12,11 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gtk
 
-from ..util.range import Range
 from .areas.area import GetOffsetFlags
 
 if TYPE_CHECKING:
     from .areas.area import Area
-    from .data_view import CursorState, DataView
+    from .data_view import DataView
     from .data_view_display import DataViewDisplay
 
 
@@ -27,12 +26,13 @@ class _Pos:
     `first` is second-1 (used only
     when extending a selection leftward over an 'abyss' boundary).
     """
+
     __slots__ = ("first", "second", "digit")
 
     def __init__(self, first: int = 0, second: int = 0, digit: int = 0) -> None:
-        self.first  = first
+        self.first = first
         self.second = second
-        self.digit  = digit
+        self.digit = digit
 
     def copy(self) -> _Pos:
         return _Pos(self.first, self.second, self.digit)
@@ -49,10 +49,10 @@ class DataViewControl:
         self._display: DataViewDisplay | None = None
 
         self._sel_start = _Pos()
-        self._sel_end   = _Pos()
+        self._sel_end = _Pos()
         # True while the mouse button is held for a drag-select
         self._mouse_selecting = False
-        self._mouse_dragged   = False  # True once pointer moves after press
+        self._mouse_dragged = False  # True once pointer moves after press
 
         self._okp_focus_area: Area | None = None
         self._okp_bpr = 1
@@ -72,9 +72,9 @@ class DataViewControl:
     def reset_selection(self) -> None:
         """Called when a new buffer is loaded — reset stale cursor state."""
         self._sel_start = _Pos(0, 0, 0)
-        self._sel_end   = _Pos(0, 0, 0)
+        self._sel_end = _Pos(0, 0, 0)
         self._mouse_selecting = False
-        self._mouse_dragged   = False
+        self._mouse_dragged = False
 
     # ------------------------------------------------------------------
     # Helper: area at (x, y)
@@ -136,8 +136,7 @@ class DataViewControl:
         dv.set_selection(-1, -1)
         dv.move_cursor(pos.second, pos.digit)
 
-    def _evaluate_selection(self, show_type: str = "closest",
-                             extend: bool = False) -> None:
+    def _evaluate_selection(self, show_type: str = "closest", extend: bool = False) -> None:
         """Update cursor and selection.
 
         extend=False  →  plain move: clear selection, place cursor.
@@ -211,7 +210,7 @@ class DataViewControl:
             else:
                 # New anchor: clear selection, move cursor
                 self._sel_start = pos.copy()
-                self._sel_end   = pos.copy()
+                self._sel_end = pos.copy()
                 self._mouse_dragged = False
                 self._evaluate_selection("closest", extend=False)
             self._mouse_selecting = True
@@ -266,13 +265,13 @@ class DataViewControl:
         ag = display.area_group
         self._okp_focus_area = ag.focused_area
         self._okp_bpr = ag.areas[0].bpr if ag.areas else 1
-        self._okp_dpb = (self._okp_focus_area.dpb if self._okp_focus_area else 2)
+        self._okp_dpb = self._okp_focus_area.dpb if self._okp_focus_area else 2
         self._okp_show_type = "closest"
 
         cur = _Pos(dv.cursor_offset - 1, dv.cursor_offset, dv.cursor_digit)
         nxt = cur.copy()
 
-        key   = event.keyval
+        key = event.keyval
         shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
         handled = False
 
@@ -320,7 +319,7 @@ class DataViewControl:
                 self._sel_end = nxt.copy()
             else:
                 self._sel_start = nxt.copy()
-                self._sel_end   = nxt.copy()
+                self._sel_end = nxt.copy()
             self._evaluate_selection(self._okp_show_type, extend=shift)
             return True
 
@@ -338,9 +337,9 @@ class DataViewControl:
             dig = self._okp_dpb - 1
         if off < 0:
             off, dig = 0, 0
-        nxt.first  = off - 1
+        nxt.first = off - 1
         nxt.second = off
-        nxt.digit  = dig
+        nxt.digit = dig
 
     def _key_right(self, cur: _Pos, nxt: _Pos) -> None:
         off, dig = cur.second, cur.digit
@@ -352,23 +351,23 @@ class DataViewControl:
         if buf and off > buf.size:
             off = buf.size
             dig = self._okp_dpb - 1
-        nxt.first  = off - 1
+        nxt.first = off - 1
         nxt.second = off
-        nxt.digit  = dig
+        nxt.digit = dig
 
     def _key_up(self, cur: _Pos, nxt: _Pos) -> None:
         off = max(0, cur.second - self._okp_bpr)
-        nxt.first  = off - 1
+        nxt.first = off - 1
         nxt.second = off
-        nxt.digit  = cur.digit
+        nxt.digit = cur.digit
 
     def _key_down(self, cur: _Pos, nxt: _Pos) -> None:
         buf = self._dv.buffer
         limit = buf.size if buf else 0
         off = min(limit, cur.second + self._okp_bpr)
-        nxt.first  = off - 1
+        nxt.first = off - 1
         nxt.second = off
-        nxt.digit  = cur.digit
+        nxt.digit = cur.digit
 
     def _key_page_up(self, cur: _Pos, nxt: _Pos) -> None:
         adj = self._display.vscroll.get_adjustment()
@@ -402,8 +401,7 @@ class DataViewControl:
         nxt.digit = 0
         self._okp_show_type = "end"
 
-    def _key_default(self, event: Gdk.EventKey,
-                     cur: _Pos, nxt: _Pos) -> bool:
+    def _key_default(self, event: Gdk.EventKey, cur: _Pos, nxt: _Pos) -> bool:
         """Handle printable/digit keys.  Returns True if consumed."""
         dv = self._dv
         fa = self._okp_focus_area
@@ -420,24 +418,29 @@ class DataViewControl:
                 consumed = True
                 self._key_right(cur, nxt)
                 from .data_view import CursorState
+
                 dv.cursor_undo_deque.appendleft(
-                    CursorState(cur.second, cur.digit, nxt.second, nxt.digit))
+                    CursorState(cur.second, cur.digit, nxt.second, nxt.digit)
+                )
                 dv.cursor_redo_deque.clear()
                 self._sel_start = self._sel_end = nxt.copy()
         else:
-            # Replace selection with typed character
+            # Replace selection with typed character.
+            # Ensure the cursor is at sel.start before inserting so the new
+            # byte lands at the beginning of the selection, not after it.
             sel = dv.selection
             dv.buffer.begin_action_chaining()
             try:
+                dv.move_cursor(sel.start, 0)
                 if fa.handle_key(event.keyval, False):
                     consumed = True
                     # Character inserted at sel.start; delete the rest of selection
                     new_end = sel.start + 1
                     if sel.end >= new_end:
                         dv.buffer.delete(new_end, sel.end + 1)
-                    nxt.first  = sel.start - 1
+                    nxt.first = sel.start - 1
                     nxt.second = sel.start + 1
-                    nxt.digit  = 0
+                    nxt.digit = 0
                     dv.set_selection(-1, -1)
             finally:
                 dv.buffer.end_action_chaining()

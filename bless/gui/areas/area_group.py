@@ -4,14 +4,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 import cairo
-from gi.repository import Gdk, Gtk
+from gi.repository import Gtk
 
 from ...util.interval_tree import IntervalTree
 from ...util.range import Range

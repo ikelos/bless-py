@@ -17,6 +17,13 @@ dependencies = [
 [project.scripts]
 bless = "bless.main:main"
 
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# E402: gi.require_version() must precede gi imports throughout the codebase.
+ignore = ["E402"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["bless*"]

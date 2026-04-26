@@ -19,7 +19,6 @@ from ..drawers import (
     BinaryDrawer,
     ColumnType,
     DecimalDrawer,
-    DrawerInfo,
     HexDrawer,
     HighlightType,
     OctalDrawer,
@@ -37,6 +36,7 @@ if TYPE_CHECKING:
 # Grouped (bytes-per-group) base for hex/decimal/octal/binary
 # ---------------------------------------------------------------------------
 
+
 class GroupedArea(Area):
     """Area variant where bytes are visually grouped with an extra space between groups."""
 
@@ -53,8 +53,7 @@ class GroupedArea(Area):
     def grouping(self, v: int) -> None:
         self._grouping = v
 
-    def _render_row_normal(self, row: int, start_byte: int,
-                           count: int, blank: bool) -> None:
+    def _render_row_normal(self, row: int, start_byte: int, count: int, blank: bool) -> None:
         if not self.drawer:
             return
         ag = self.area_group
@@ -63,7 +62,7 @@ class GroupedArea(Area):
         roffset = ag.offset + row * self.bpr + start_byte
         odd = ((roffset // self.bpr) % 2) == 1
         back_even = self.drawer.get_background_color(RowType.Even, HighlightType.Normal)
-        back_odd  = self.drawer.get_background_color(RowType.Odd,  HighlightType.Normal)
+        back_odd = self.drawer.get_background_color(RowType.Odd, HighlightType.Normal)
 
         if blank:
             self._fill_rect(back_odd if odd else back_even, rx, ry, self.width, self.drawer.height)
@@ -73,26 +72,30 @@ class GroupedArea(Area):
 
         # Advance rx to the start_byte column position
         for skip in range(start_byte):
-            w_step = ((self.dpb + 1) * self.drawer.width
-                      if skip % self._grouping == self._grouping - 1
-                      else self.dpb * self.drawer.width)
+            w_step = (
+                (self.dpb + 1) * self.drawer.width
+                if skip % self._grouping == self._grouping - 1
+                else self.dpb * self.drawer.width
+            )
             rx += w_step
 
         row_type = RowType.Odd if odd else RowType.Even
         for pos in range(start_byte, start_byte + count):
-            col_type = (ColumnType.Even if (pos // self._grouping) % 2 == 0
-                        else ColumnType.Odd)
-            self.drawer.draw_normal(self._cr, rx, ry,
-                                    ag.get_cached_byte(roffset), row_type, col_type)
+            col_type = ColumnType.Even if (pos // self._grouping) % 2 == 0 else ColumnType.Odd
+            self.drawer.draw_normal(
+                self._cr, rx, ry, ag.get_cached_byte(roffset), row_type, col_type
+            )
             roffset += 1
-            w_step = ((self.dpb + 1) * self.drawer.width
-                      if pos % self._grouping == self._grouping - 1
-                      else self.dpb * self.drawer.width)
+            w_step = (
+                (self.dpb + 1) * self.drawer.width
+                if pos % self._grouping == self._grouping - 1
+                else self.dpb * self.drawer.width
+            )
             rx += w_step
 
-    def _render_row_highlight(self, row: int, start_byte: int,
-                               count: int, blank: bool,
-                               ht: HighlightType) -> None:
+    def _render_row_highlight(
+        self, row: int, start_byte: int, count: int, blank: bool, ht: HighlightType
+    ) -> None:
         if not self.drawer:
             return
         ag = self.area_group
@@ -106,13 +109,15 @@ class GroupedArea(Area):
 
         dw = self.drawer.width
         dh = self.drawer.height
-        last = start_byte + count - 1   # index of the last highlighted byte
+        last = start_byte + count - 1  # index of the last highlighted byte
 
         # Advance rx to start_byte column position
         for skip in range(start_byte):
-            w_step = ((self.dpb + 1) * dw
-                      if skip % self._grouping == self._grouping - 1
-                      else self.dpb * dw)
+            w_step = (
+                (self.dpb + 1) * dw
+                if skip % self._grouping == self._grouping - 1
+                else self.dpb * dw
+            )
             rx += w_step
 
         # Compute the span of highlighted pixels.
@@ -120,7 +125,7 @@ class GroupedArea(Area):
         # For the last byte: only include the glyph itself (no trailing gap).
         span_rx = rx
         for pos in range(start_byte, start_byte + count):
-            is_group_end = (pos % self._grouping == self._grouping - 1)
+            is_group_end = pos % self._grouping == self._grouping - 1
             if pos == last:
                 # Last selected byte — only the glyph, no trailing gap
                 span_rx += self.dpb * dw
@@ -131,18 +136,18 @@ class GroupedArea(Area):
                 span_rx += self.dpb * dw
 
         # Fill exactly the glyph span (no overhang) with highlight background
-        back = self.drawer.get_background_color(
-            RowType.Odd if odd else RowType.Even, ht)
+        back = self.drawer.get_background_color(RowType.Odd if odd else RowType.Even, ht)
         self._fill_rect(back, rx, ry, span_rx - rx, dh)
 
         # Redraw each glyph with the highlight surface
         row_type = RowType.Odd if odd else RowType.Even
         cur_rx = rx
         for pos in range(start_byte, start_byte + count):
-            self.drawer.draw_highlight(self._cr, cur_rx, ry,
-                                       ag.get_cached_byte(roffset), row_type, ht)
+            self.drawer.draw_highlight(
+                self._cr, cur_rx, ry, ag.get_cached_byte(roffset), row_type, ht
+            )
             roffset += 1
-            is_group_end = (pos % self._grouping == self._grouping - 1)
+            is_group_end = pos % self._grouping == self._grouping - 1
             if pos == last:
                 cur_rx += self.dpb * dw
             elif is_group_end:
@@ -165,10 +170,10 @@ class GroupedArea(Area):
 
     def get_display_info_by_offset(self, offset: int) -> tuple[int, int, int, int]:
         ag = self.area_group
-        row   = (offset - ag.offset) // self.bpr
+        row = (offset - ag.offset) // self.bpr
         obyte = (offset - ag.offset) % self.bpr
-        oy    = row * (self.drawer.height if self.drawer else 0)
-        group       = obyte // self._grouping
+        oy = row * (self.drawer.height if self.drawer else 0)
+        group = obyte // self._grouping
         group_offset = obyte % self._grouping
         dw = self.drawer.width if self.drawer else 8
         ox = group * (self._grouping * self.dpb * dw + dw) + self.dpb * dw * group_offset
@@ -182,7 +187,7 @@ class GroupedArea(Area):
         dw = self.drawer.width
         dh = self.drawer.height
         group_w = self._grouping * self.dpb * dw + dw
-        row   = y // dh
+        row = y // dh
         group = x // group_w
         group_byte = (x - group * group_w) // (self.dpb * dw)
         digit = (x - group * group_w - group_byte * self.dpb * dw) // dw
@@ -199,6 +204,7 @@ class GroupedArea(Area):
 # HexArea
 # ---------------------------------------------------------------------------
 
+
 class HexArea(GroupedArea):
     def __init__(self, ag: AreaGroup) -> None:
         super().__init__(ag)
@@ -212,6 +218,7 @@ class HexArea(GroupedArea):
     def handle_key(self, key: int, overwrite: bool) -> bool:
         ag = self.area_group
         from gi.repository import Gdk as _Gdk
+
         hex_val = -1
         if _Gdk.KEY_0 <= key <= _Gdk.KEY_9:
             hex_val = key - _Gdk.KEY_0
@@ -259,6 +266,7 @@ class HexArea(GroupedArea):
 # AsciiArea
 # ---------------------------------------------------------------------------
 
+
 class AsciiArea(Area):
     def __init__(self, ag: AreaGroup) -> None:
         super().__init__(ag)
@@ -270,8 +278,7 @@ class AsciiArea(Area):
         self.drawer = AsciiDrawer(self.area_group.drawing_area, self.drawer_info)
         super().realize()
 
-    def _render_row_normal(self, row: int, start_byte: int,
-                           count: int, blank: bool) -> None:
+    def _render_row_normal(self, row: int, start_byte: int, count: int, blank: bool) -> None:
         if not self.drawer:
             return
         ag = self.area_group
@@ -281,21 +288,23 @@ class AsciiArea(Area):
         odd = ((roffset // self.bpr) % 2) == 1
         if blank:
             back = self.drawer.get_background_color(
-                RowType.Odd if odd else RowType.Even, HighlightType.Normal)
+                RowType.Odd if odd else RowType.Even, HighlightType.Normal
+            )
             self._fill_rect(back, rx, ry, self.width, self.drawer.height)
         if count <= 0:
             return
         row_type = RowType.Odd if odd else RowType.Even
         rx += start_byte * self.drawer.width
         for _ in range(count):
-            self.drawer.draw_normal(self._cr, rx, ry,
-                                    ag.get_cached_byte(roffset), row_type, ColumnType.Even)
+            self.drawer.draw_normal(
+                self._cr, rx, ry, ag.get_cached_byte(roffset), row_type, ColumnType.Even
+            )
             rx += self.drawer.width
             roffset += 1
 
-    def _render_row_highlight(self, row: int, start_byte: int,
-                               count: int, blank: bool,
-                               ht: HighlightType) -> None:
+    def _render_row_highlight(
+        self, row: int, start_byte: int, count: int, blank: bool, ht: HighlightType
+    ) -> None:
         if not self.drawer:
             return
         ag = self.area_group
@@ -305,8 +314,7 @@ class AsciiArea(Area):
         odd = ((roffset // self.bpr) % 2) == 1
         row_type = RowType.Odd if odd else RowType.Even
         for _ in range(count):
-            self.drawer.draw_highlight(self._cr, rx, ry,
-                                       ag.get_cached_byte(roffset), row_type, ht)
+            self.drawer.draw_highlight(self._cr, rx, ry, ag.get_cached_byte(roffset), row_type, ht)
             rx += self.drawer.width
             roffset += 1
 
@@ -318,7 +326,7 @@ class AsciiArea(Area):
 
     def get_display_info_by_offset(self, offset: int) -> tuple[int, int, int, int]:
         ag = self.area_group
-        row   = (offset - ag.offset) // self.bpr
+        row = (offset - ag.offset) // self.bpr
         obyte = (offset - ag.offset) % self.bpr
         dw = self.drawer.width if self.drawer else 8
         dh = self.drawer.height if self.drawer else 16
@@ -329,9 +337,9 @@ class AsciiArea(Area):
         ag = self.area_group
         dw = self.drawer.width if self.drawer else 8
         dh = self.drawer.height if self.drawer else 16
-        row  = y // dh
-        col  = x // dw
-        off  = ag.offset + row * self.bpr + col
+        row = y // dh
+        col = x // dw
+        off = ag.offset + row * self.bpr + col
         if ag.buffer and off >= ag.buffer.size:
             flags |= GetOffsetFlags.Eof
         return off, 0, flags
@@ -357,6 +365,7 @@ class AsciiArea(Area):
 # OffsetArea
 # ---------------------------------------------------------------------------
 
+
 class OffsetArea(Area):
     """Read-only column showing the file offset of each row."""
 
@@ -364,7 +373,7 @@ class OffsetArea(Area):
         super().__init__(ag)
         self.area_type = "offset"
         self.dpb = 2
-        self._bytes = 4   # how many offset bytes to display (4 → 8 hex digits)
+        self._bytes = 4  # how many offset bytes to display (4 → 8 hex digits)
 
     def realize(self) -> None:
         # Set offset digits to red to match the original Bless appearance
@@ -423,14 +432,14 @@ class OffsetArea(Area):
         roffset = ag.offset + row * self.bpr
         odd = (row % 2) == 1
         back = self.drawer.get_background_color(
-            RowType.Odd if odd else RowType.Even, HighlightType.Normal)
+            RowType.Odd if odd else RowType.Even, HighlightType.Normal
+        )
         self._fill_rect(back, self.x, ry, self.width, dh)
         row_type = RowType.Odd if odd else RowType.Even
         rx = (self._bytes - 1) * 2 * dw + self.x
         val = roffset
         for _ in range(self._bytes):
-            self.drawer.draw_normal(self._cr, rx, ry, val & 0xFF,
-                                    row_type, ColumnType.Even)
+            self.drawer.draw_normal(self._cr, rx, ry, val & 0xFF, row_type, ColumnType.Even)
             val >>= 8
             rx -= 2 * dw
 
@@ -441,11 +450,11 @@ class OffsetArea(Area):
         ry = row * dh + self.y
         odd = (row % 2) == 1
         back = self.drawer.get_background_color(
-            RowType.Odd if odd else RowType.Even, HighlightType.Normal)
+            RowType.Odd if odd else RowType.Even, HighlightType.Normal
+        )
         self._fill_rect(back, self.x, ry, self.width, dh)
 
-    def _render_row_normal(self, row: int, start_byte: int,
-                           count: int, blank: bool) -> None:
+    def _render_row_normal(self, row: int, start_byte: int, count: int, blank: bool) -> None:
         if not self.drawer:
             return
         ag = self.area_group
@@ -456,7 +465,8 @@ class OffsetArea(Area):
         roffset = ag.offset + row * self.bpr
         odd = ((roffset // self.bpr) % 2) == 1
         back = self.drawer.get_background_color(
-            RowType.Odd if odd else RowType.Even, HighlightType.Normal)
+            RowType.Odd if odd else RowType.Even, HighlightType.Normal
+        )
         if blank:
             self._fill_rect(back, self.x, ry, self.width, dh)
         if count == 0:
@@ -464,14 +474,13 @@ class OffsetArea(Area):
         row_type = RowType.Odd if odd else RowType.Even
         val = roffset
         for _ in range(self._bytes):
-            self.drawer.draw_normal(self._cr, rx, ry, val & 0xFF,
-                                    row_type, ColumnType.Even)
+            self.drawer.draw_normal(self._cr, rx, ry, val & 0xFF, row_type, ColumnType.Even)
             val >>= 8
             rx -= 2 * dw
 
-    def _render_row_highlight(self, row: int, start_byte: int,
-                               count: int, blank: bool,
-                               ht: HighlightType) -> None:
+    def _render_row_highlight(
+        self, row: int, start_byte: int, count: int, blank: bool, ht: HighlightType
+    ) -> None:
         self._render_row_normal(row, start_byte, count, blank)
 
     def calc_width(self, n: int, force: bool = False) -> int:
@@ -494,6 +503,7 @@ class OffsetArea(Area):
 # ---------------------------------------------------------------------------
 # DecimalArea / OctalArea / BinaryArea — trivial subclasses of GroupedArea
 # ---------------------------------------------------------------------------
+
 
 class DecimalArea(GroupedArea):
     def __init__(self, ag: AreaGroup) -> None:
@@ -534,7 +544,7 @@ class SeparatorArea(Area):
     def __init__(self, ag: AreaGroup) -> None:
         super().__init__(ag)
         self.area_type = "separator"
-        self._sep_width = 8   # total pixel width — one full character
+        self._sep_width = 8  # total pixel width — one full character
 
     def render(self) -> None:
         """Draw a thin 1-pixel vertical line down to the bottom of the last content row."""
@@ -549,6 +559,7 @@ class SeparatorArea(Area):
         for a in ag.areas:
             if a.drawer and hasattr(a.drawer, "get_background_color"):
                 from ..drawers import HighlightType, RowType
+
                 bg_color = a.drawer.get_background_color(RowType.Even, HighlightType.Normal)
                 break
 
@@ -581,7 +592,7 @@ class SeparatorArea(Area):
             visible_bytes = min(buf_size - ag.offset, nrows * bpr)
             visible_bytes = max(visible_bytes, 0)
             data_rows = (visible_bytes + bpr - 1) // bpr
-            content_rows = data_rows + 1   # +1 trailing offset row
+            content_rows = data_rows  # stop at the bottom of the last content row
 
         line_bottom = self.y + min(content_rows * row_h, self.height)
 
@@ -594,8 +605,11 @@ class SeparatorArea(Area):
         cr.stroke()
         cr.restore()
 
-    def _render_row_normal(self, *_): pass
-    def _render_row_highlight(self, *_): pass
+    def _render_row_normal(self, *_):
+        pass
+
+    def _render_row_highlight(self, *_):
+        pass
 
     def calc_width(self, n: int, force: bool = False) -> int:
         return self._sep_width
@@ -612,9 +626,9 @@ class SeparatorArea(Area):
 # ---------------------------------------------------------------------------
 
 register_area("hexadecimal", lambda ag: HexArea(ag))
-register_area("ascii",       lambda ag: AsciiArea(ag))
-register_area("offset",      lambda ag: OffsetArea(ag))
-register_area("decimal",     lambda ag: DecimalArea(ag))
-register_area("octal",       lambda ag: OctalArea(ag))
-register_area("binary",      lambda ag: BinaryArea(ag))
-register_area("separator",   lambda ag: SeparatorArea(ag))
+register_area("ascii", lambda ag: AsciiArea(ag))
+register_area("offset", lambda ag: OffsetArea(ag))
+register_area("decimal", lambda ag: DecimalArea(ag))
+register_area("octal", lambda ag: OctalArea(ag))
+register_area("binary", lambda ag: BinaryArea(ag))
+register_area("separator", lambda ag: SeparatorArea(ag))

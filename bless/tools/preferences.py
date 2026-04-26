@@ -7,7 +7,6 @@ from __future__ import annotations
 import os
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
-from typing import Optional
 
 PreferencesChangedHandler = Callable[["Preferences"], None]
 

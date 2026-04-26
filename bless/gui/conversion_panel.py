@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import struct
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import gi
 

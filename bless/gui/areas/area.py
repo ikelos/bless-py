@@ -7,7 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from enum import IntFlag
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import gi
 
@@ -15,14 +15,14 @@ gi.require_version("Gdk", "3.0")
 import cairo
 from gi.repository import Gdk
 
-from ..drawers import ColumnType, Drawer, DrawerInfo, HighlightType, RowType
+from ..drawers import Drawer, DrawerInfo, HighlightType
 
 if TYPE_CHECKING:
     from .area_group import AreaGroup
 
 
 class GetOffsetFlags(IntFlag):
-    Eof   = 1
+    Eof = 1
     Abyss = 2
 
 
@@ -60,9 +60,9 @@ class Area(ABC):
         self.y: int = 0
         self.width: int = 0
         self.height: int = 0
-        self.bpr: int = 0          # bytes per row
-        self.dpb: int = 0          # digits per byte
-        self.fixed_bpr: int = -1   # -1 means auto
+        self.bpr: int = 0  # bytes per row
+        self.dpb: int = 0  # digits per byte
+        self.fixed_bpr: int = -1  # -1 means auto
 
         self._cr: cairo.Context | None = None
         self._realized: bool = False
@@ -71,7 +71,7 @@ class Area(ABC):
         self._cursor_focus: bool = False
         self._is_active: bool = True
 
-        self._active_cursor_color   = Gdk.RGBA(red=1, green=0, blue=0, alpha=1)
+        self._active_cursor_color = Gdk.RGBA(red=1, green=0, blue=0, alpha=1)
         self._inactive_cursor_color = Gdk.RGBA(red=0.5, green=0.5, blue=0.5, alpha=1)
 
     # ------------------------------------------------------------------
@@ -79,25 +79,20 @@ class Area(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def _render_row_normal(self, row: int, start_byte: int,
-                           count: int, blank: bool) -> None: ...
+    def _render_row_normal(self, row: int, start_byte: int, count: int, blank: bool) -> None: ...
 
     @abstractmethod
-    def _render_row_highlight(self, row: int, start_byte: int,
-                               count: int, blank: bool,
-                               ht: HighlightType) -> None: ...
+    def _render_row_highlight(
+        self, row: int, start_byte: int, count: int, blank: bool, ht: HighlightType
+    ) -> None: ...
 
     @abstractmethod
-    def get_display_info_by_offset(
-        self, offset: int
-    ) -> tuple[int, int, int, int]:
+    def get_display_info_by_offset(self, offset: int) -> tuple[int, int, int, int]:
         """Return (row, byte_in_row, x, y)."""
         ...
 
     @abstractmethod
-    def get_offset_by_display_info(
-        self, x: int, y: int
-    ) -> tuple[int, int, GetOffsetFlags]:
+    def get_offset_by_display_info(self, x: int, y: int) -> tuple[int, int, GetOffsetFlags]:
         """Return (offset, digit, flags)."""
         ...
 
@@ -114,7 +109,7 @@ class Area(ABC):
         return False
 
     def realize(self) -> None:
-        self._active_cursor_color   = Gdk.RGBA(red=1, green=0, blue=0, alpha=1)
+        self._active_cursor_color = Gdk.RGBA(red=1, green=0, blue=0, alpha=1)
         self._inactive_cursor_color = Gdk.RGBA(red=0.5, green=0.5, blue=0.5, alpha=1)
         self._realized = True
 
@@ -171,12 +166,14 @@ class Area(ABC):
     def _render_highlights(self) -> None:
         ag = self.area_group
         overlaps = ag.get_highlights_in_view()
+        # Render in ascending type-value order so Selection (3) always
+        # paints on top of PatternMatch (2), keeping dark-blue visible.
+        overlaps.sort(key=lambda h: int(h.type))
         for h in overlaps:
             if not h.is_empty():
                 self._render_highlight_range(h.start, h.end, h.type)
 
-    def _render_highlight_range(self, start: int, end: int,
-                                 ht: HighlightType) -> None:
+    def _render_highlight_range(self, start: int, end: int, ht: HighlightType) -> None:
         """Render the bytes [start, end] with the given highlight type."""
         ag = self.area_group
         if self.drawer is None or self.bpr <= 0 or ag.buffer is None:
@@ -185,33 +182,32 @@ class Area(ABC):
         if dh <= 0:
             return
         view_start = ag.offset
-        view_end   = view_start + (self.height // dh) * self.bpr - 1
+        view_end = view_start + (self.height // dh) * self.bpr - 1
 
         # Clamp to visible range
         hl_start = max(start, view_start)
-        hl_end   = min(end,   view_end)
+        hl_end = min(end, view_end)
         if hl_start > hl_end:
             return
 
         first_row = (hl_start - view_start) // self.bpr
-        last_row  = (hl_end   - view_start) // self.bpr
+        last_row = (hl_end - view_start) // self.bpr
 
         for row in range(first_row, last_row + 1):
             row_start_off = view_start + row * self.bpr
             # byte index within this row where highlight begins/ends
             sb = max(hl_start - row_start_off, 0)
-            eb = min(hl_end   - row_start_off, self.bpr - 1)
+            eb = min(hl_end - row_start_off, self.bpr - 1)
             count = eb - sb + 1
             if count > 0:
                 self._render_row_highlight(row, sb, count, False, ht)
 
-    def _render_highlight(self, h, left_ht: HighlightType,
-                          right_ht: HighlightType) -> None:
+    def _render_highlight(self, h, left_ht: HighlightType, right_ht: HighlightType) -> None:
         """Legacy single-highlight entry point — delegates to _render_highlight_range."""
         if not h.is_empty():
-            self._render_highlight_range(h.start, h.end,
-                                         h.type if hasattr(h, 'type')
-                                         else HighlightType.Selection)
+            self._render_highlight_range(
+                h.start, h.end, h.type if hasattr(h, "type") else HighlightType.Selection
+            )
 
     def _render_cursor(self) -> None:
         # Draw cursor in every focusable area simultaneously.
@@ -227,17 +223,17 @@ class Area(ABC):
         cx += digit_off * self.drawer.width
         sx = cx + self.x
         sy = cy + self.y
-        w  = self.drawer.width
-        h  = self.drawer.height
+        w = self.drawer.width
+        h = self.drawer.height
         color = self._active_cursor_color if self._cursor_focus else self._inactive_cursor_color
-        lw_h = 2.0 if self._cursor_focus else 1.0   # underline width
-        lw_v = 1.0                                    # vertical bar always 1px
+        lw_h = 2.0 if self._cursor_focus else 1.0  # underline width
+        lw_v = 1.0  # vertical bar always 1px
         cr = self._cr
         cr.save()
         cr.set_source_rgba(color.red, color.green, color.blue, color.alpha)
         # Underline along the bottom of the character cell
         cr.set_line_width(lw_h)
-        cr.move_to(sx,     sy + h - lw_h / 2)
+        cr.move_to(sx, sy + h - lw_h / 2)
         cr.line_to(sx + w, sy + h - lw_h / 2)
         cr.stroke()
         # Thin vertical bar on the left edge of the active digit

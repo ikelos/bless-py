@@ -5,8 +5,9 @@
 _DEFAULT_MIN_DIGITS = [0, 0, 8, 6, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2]
 
 
-def convert_to_string(num: int, base: int, prepend_prefix: bool = False,
-                      lowercase: bool = False, min_digits: int = 0) -> str:
+def convert_to_string(
+    num: int, base: int, prepend_prefix: bool = False, lowercase: bool = False, min_digits: int = 0
+) -> str:
     if base < 2 or base > 16:
         return ""
 
@@ -53,8 +54,7 @@ def _char_to_int(c: str, base: int) -> int:
     return v
 
 
-def convert_to_num(s: str, base: int,
-                   start: int = 0, end: int = -1) -> int:
+def convert_to_num(s: str, base: int, start: int = 0, end: int = -1) -> int:
     if end == -1:
         end = len(s) - 1
     val = 0
@@ -82,8 +82,23 @@ def byte_array_to_string(data: bytes, base: int) -> str:
 
 
 def string_to_byte_array(s: str, base: int) -> bytes:
-    """Parse a space-separated string of base-*base* values into bytes."""
-    parts = s.split()
+    """Parse a string of base-*base* values into bytes.
+
+    For base-16 the input may be space-separated pairs *or* a compact run of
+    hex digits (spaces are optional).  An odd number of digits is padded with
+    a trailing ``0`` so that every pair maps to one byte (e.g. ``"CF9"``
+    becomes ``CF 90``).
+    """
+    if base == 16:
+        # Collapse all whitespace, then chop into 2-char nibble pairs.
+        stripped = s.replace(" ", "").replace("\t", "")
+        if not stripped:
+            return b""
+        if len(stripped) % 2:
+            stripped += "0"
+        parts = [stripped[i : i + 2] for i in range(0, len(stripped), 2)]
+    else:
+        parts = s.split()
     result = bytearray()
     for p in parts:
         result.append(convert_to_num(p, base) & 0xFF)
