@@ -125,13 +125,21 @@ class MainWindow(Gtk.ApplicationWindow):
         # DataBook (tabs)
         root.pack_start(self._data_book, True, True, 0)
 
-        # Status bar
+        # Status bar.
+        # GtkStatusbar inherits from GtkBox, which has no GdkWindow of its own.
+        # GTK3 dispatches pointer events starting from the widget that *owns*
+        # the GdkWindow that received the click, then walks UP the parent chain
+        # via gtk_propagate_event().  Because GtkWindow (the toplevel) has no
+        # parent, propagation ends immediately and the no-window Statusbar child
+        # is never visited — add_events() on the Statusbar is therefore
+        # ineffective.  Wrapping in an EventBox gives the statusbar area its
+        # own GdkWindow so GDK delivers the event directly to it.
         self._statusbar = Gtk.Statusbar()
-        root.pack_start(self._statusbar, False, False, 0)
         self._ctx = self._statusbar.get_context_id("main")
-        # Enable button events so clicking cycles the display radix
-        self._statusbar.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
-        self._statusbar.connect("button-press-event", lambda *_: self._cycle_statusbar_radix())
+        _sb_event_box = Gtk.EventBox()
+        _sb_event_box.add(self._statusbar)
+        root.pack_start(_sb_event_box, False, False, 0)
+        _sb_event_box.connect("button-press-event", lambda *_: self._cycle_statusbar_radix())
 
     def _build_menu_bar(self, accel_group: Gtk.AccelGroup) -> Gtk.MenuBar:
         mb = Gtk.MenuBar()
